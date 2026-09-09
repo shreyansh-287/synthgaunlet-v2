@@ -1,0 +1,26 @@
+# Runtime and API
+fastapi
+uvicorn
+python-multipart
+pydantic
+pydantic-settings
+
+# Deterministic data, statistics, and synthesis
+pandas
+numpy
+scipy
+scikit-learn
+
+# Gemini and Google Cloud
+google-genai==2.19.0
+
+# BigQuery integration (optional — for importing datasets from GCP)
+google-cloud-bigquery>=3.0.0
+db-dtypes==1.4.4
+google-auth>=2.0.0
+
+# Configuration and verification
+python-dotenv
+pytest
+
+

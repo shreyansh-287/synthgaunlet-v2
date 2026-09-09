@@ -1,0 +1,24 @@
+# Python
+.venv/
+.venv-synthgauntlet/
+__pycache__/
+*.pyc
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+credentials/
+secrets/
+service-account*.json
+
+# Generated synthetic outputs & local runtime history
+data/output/
+data/uploads/
+data/run_results/
+data/history_*.json
+data/*.json
+
+# Keep the static demo datasets committed (they are treated as static input).
+!data/raw/
+!data/raw/**

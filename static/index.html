@@ -1,0 +1,3310 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SynthGauntlet</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#f0eeff',
+              100: '#e1dcfe',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #090d16; color: #f1f5f9; overflow-x: hidden; width: 100%; -webkit-tap-highlight-color: transparent; }
+    body.modal-open { overflow: hidden !important; touch-action: none; }
+    .glow { box-shadow: 0 0 35px -5px rgba(99, 102, 241, 0.45); }
+    .bar { transition: width .8s cubic-bezier(.22,1,.36,1); }
+    .agent-active { animation: breathe 1.2s ease-in-out infinite; }
+    @keyframes breathe { 0%,100%{ box-shadow:0 0 0 0 rgba(99, 102, 241, 0.5) } 50%{ box-shadow:0 0 0 8px rgba(99, 102, 241, 0) } }
+    .fade-in { animation: fadeIn .35s ease-out; }
+    @keyframes fadeIn { from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none} }
+    .scroll { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+    .scroll::-webkit-scrollbar{width:5px} .scroll::-webkit-scrollbar-track{background:rgba(15,23,42,0.6);border-radius:9999px} .scroll::-webkit-scrollbar-thumb{background:#4f46e5;border-radius:9999px} .scroll::-webkit-scrollbar-thumb:hover{background:#6366f1}
+    #sidebarHistory { -webkit-overflow-scrolling: touch !important; touch-action: pan-y !important; scrollbar-width: thin; scrollbar-color: rgba(99, 102, 241, 0.6) rgba(15, 23, 42, 0.6); }
+    #sidebarHistory::-webkit-scrollbar { width: 5px !important; display: block !important; }
+    #sidebarHistory::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); border-radius: 9999px; }
+    #sidebarHistory::-webkit-scrollbar-thumb { background: #4f46e5; border-radius: 9999px; }
+    #sidebarHistory::-webkit-scrollbar-thumb:hover { background: #6366f1; }
+    .history-item.active { background-color: rgba(99, 102, 241, 0.15); border-color: rgba(99, 102, 241, 0.4); color: #ffffff; }
+    .section-highlight { animation: sectionPulse 3.5s ease-out forwards; }
+    @keyframes sectionPulse {
+      0%   { box-shadow: 0 0 0 0 rgba(34,197,94,0); border-color: rgb(51,65,85); }
+      15%  { box-shadow: 0 0 0 6px rgba(34,197,94,0.35); border-color: rgba(34,197,94,0.7); background-color: rgba(34,197,94,0.07); }
+      60%  { box-shadow: 0 0 0 4px rgba(34,197,94,0.15); border-color: rgba(34,197,94,0.4); background-color: rgba(34,197,94,0.04); }
+      100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); border-color: rgb(51,65,85); background-color: transparent; }
+    }
+    @media (max-width: 767px) {
+      .modal-card { width: 94vw !important; max-width: 94vw !important; max-height: 88vh !important; }
+      .history-item { padding: 0.65rem 0.75rem; border-radius: 1rem; }
+    }
+  </style>
+</head>
+<body class="bg-[#090d16] min-h-screen text-slate-100 flex flex-col md:flex-row relative overflow-x-hidden w-full">
+
+  <!-- Left Sidebar (Collapsible Desktop & Premium Drawer Mobile) -->
+  <aside id="sidebar" class="w-72 sm:w-80 md:w-64 max-w-[85vw] md:max-w-none bg-slate-900/98 md:bg-slate-900/95 border-r border-slate-800/80 h-[100dvh] max-h-[100dvh] flex flex-col justify-between p-4 sm:p-5 fixed md:sticky top-0 z-50 md:z-40 backdrop-blur-2xl md:backdrop-blur-md transition-all duration-300 -translate-x-full md:translate-x-0 shrink-0 shadow-2xl md:shadow-none overflow-hidden">
+    <div class="flex flex-col min-h-0 flex-1 overflow-hidden">
+      <!-- Brand Logo + Collapse / Close Buttons -->
+      <div class="flex items-center justify-between px-1 py-1 mb-4 sm:mb-5 shrink-0 gap-2">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="h-9 w-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white grid place-items-center font-black text-base shadow-lg shadow-indigo-500/25 shrink-0">
+            <svg class="w-4.5 h-4.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
+          </div>
+          <span class="font-extrabold text-lg tracking-tight text-white whitespace-nowrap truncate">SynthGauntlet</span>
+        </div>
+        <!-- Desktop Collapse Button -->
+        <button id="desktopSidebarToggle" type="button" onclick="toggleSidebar()" title="Collapse Sidebar"
+                class="hidden md:flex p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-slate-200 border border-slate-700/80 transition cursor-pointer shrink-0 ml-auto">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/>
+          </svg>
+        </button>
+        <!-- Mobile Close Button -->
+        <button type="button" onclick="closeMobileSidebar()" title="Close Sidebar"
+                class="flex md:hidden h-8 w-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white items-center justify-center border border-slate-700/80 transition cursor-pointer shrink-0 ml-auto font-bold text-sm">
+          ✕
+        </button>
+      </div>
+
+      <!-- Navigation Links -->
+      <nav class="space-y-1 shrink-0">
+        <a href="#" onclick="closeMobileSidebar()" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl bg-indigo-600/15 text-indigo-400 border border-indigo-500/20 font-bold text-xs transition">
+          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+          <span class="whitespace-nowrap">Home</span>
+        </a>
+        <a href="#sampleDatasetsSection" onclick="closeMobileSidebar()" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-400 hover:bg-slate-800/60 hover:text-slate-200 font-semibold text-xs transition">
+          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.58 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.58 4 8 4s8-1.79 8-4M4 7c0-2.21 3.58-4 8-4s8 1.79 8 4m0 5c0 2.21-3.58 4-8 4s-8-1.79-8-4"/></svg>
+          <span class="whitespace-nowrap">Datasets</span>
+        </a>
+        <a href="#castSection" onclick="closeMobileSidebar()" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-400 hover:bg-slate-800/60 hover:text-slate-200 font-semibold text-xs transition">
+          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+          <span class="whitespace-nowrap">Analysis</span>
+        </a>
+        <a href="#scorecardSection" onclick="closeMobileSidebar()" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-400 hover:bg-slate-800/60 hover:text-slate-200 font-semibold text-xs transition">
+          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          <span class="whitespace-nowrap">Reports</span>
+        </a>
+      </nav>
+
+      <!-- History / Past Runs Section (Scrolls smoothly in middle) -->
+      <div class="mt-4 pt-3 border-t border-slate-800/80 flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div class="flex items-center justify-between px-2 mb-2 shrink-0">
+          <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 whitespace-nowrap">
+            <svg class="w-3.5 h-3.5 text-indigo-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Recent History
+          </span>
+          <button type="button" onclick="clearAllHistory()" title="Clear all history records"
+                  class="text-[10px] font-bold text-slate-500 hover:text-rose-300 transition px-2 py-0.5 rounded hover:bg-rose-500/10 cursor-pointer">
+            Clear All
+          </button>
+        </div>
+
+        <div id="sidebarHistory" class="space-y-1.5 overflow-y-auto scroll pr-1 flex-1 min-h-0 touch-pan-y">
+          <!-- Dynamic History items populated via JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Pinned Bottom Footer: Need Help widget -->
+    <div class="shrink-0 pt-3 mt-2 border-t border-slate-800/80">
+      <div onclick="openHelpModal()" class="bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-indigo-500/40 rounded-2xl p-3 flex items-center gap-3 cursor-pointer transition group shadow-sm">
+        <div class="h-8 w-8 rounded-xl bg-indigo-600/20 text-indigo-400 grid place-items-center shrink-0 border border-indigo-500/30 group-hover:scale-105 transition-transform">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+        </div>
+        <div class="min-w-0">
+          <p class="text-xs font-bold text-slate-200 leading-tight truncate">Need Help?</p>
+          <p class="text-[10px] text-indigo-400 font-medium group-hover:underline mt-0.5 truncate">Check documentation</p>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Mobile Drawer Backdrop Overlay -->
+  <div id="sidebarOverlay" onclick="toggleSidebar()" class="fixed inset-0 bg-slate-950/80 z-40 hidden md:hidden backdrop-blur-sm transition-opacity"></div>
+
+  <!-- Floating Desktop Expand Sidebar Button (Icon Only Single Arrow) -->
+  <button id="expandSidebarBtn" type="button" onclick="toggleSidebar()" title="Expand Sidebar"
+          class="hidden fixed top-4 left-4 z-30 p-2.5 rounded-xl bg-slate-900/95 border border-slate-700/80 text-indigo-400 hover:text-white shadow-2xl backdrop-blur-md hover:bg-slate-800 transition cursor-pointer">
+    <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/>
+    </svg>
+  </button>
+
+  <!-- Main Content Wrapper -->
+  <div class="flex-1 flex flex-col min-w-0 w-full overflow-x-hidden">
+
+    <!-- Mobile Top Header Bar (Modern App Bar) -->
+    <header class="md:hidden sticky top-0 z-30 bg-slate-900/95 border-b border-slate-800/80 px-4 py-3 flex items-center justify-between backdrop-blur-xl shadow-lg">
+      <div class="flex items-center gap-3 min-w-0">
+        <button type="button" onclick="toggleSidebar()" class="p-2.5 rounded-xl bg-slate-800/90 text-slate-200 hover:text-white border border-slate-700/80 active:scale-95 transition cursor-pointer shadow-sm shrink-0" title="Open Navigation">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+        </button>
+        <div class="flex items-center gap-2 min-w-0">
+          <div class="h-8 w-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 grid place-items-center text-white font-black text-xs shadow-md shadow-indigo-500/20 shrink-0">
+            SG
+          </div>
+          <span class="font-extrabold text-base tracking-tight text-white truncate">SynthGauntlet</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Page Body Container -->
+    <main class="p-4 sm:p-6 md:p-8 lg:p-10 max-w-7xl w-full mx-auto space-y-4 sm:space-y-6 overflow-hidden pb-10">
+
+      <!-- Hero Banner Section: Desktop Version (Hidden on Mobile) -->
+      <section class="hidden md:flex bg-gradient-to-r from-indigo-950/80 via-slate-900 to-purple-950/70 rounded-2xl p-4 sm:px-6 sm:py-4 text-white relative overflow-hidden border border-indigo-500/30 shadow-lg items-center justify-between gap-4">
+        <div class="z-10 flex items-center gap-3 min-w-0">
+          <span class="text-xl shrink-0">👋</span>
+          <div class="min-w-0">
+            <h2 class="text-sm sm:text-base font-extrabold tracking-tight text-slate-100 truncate">Welcome to SynthGauntlet</h2>
+            <p class="text-slate-300 text-[11px] sm:text-xs leading-normal font-normal">
+              Import your data and start your privacy & utility evaluation.
+            </p>
+          </div>
+        </div>
+        <div class="shrink-0 flex items-center justify-center h-14 w-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/25 shadow-lg">
+          <svg class="w-7 h-7 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
+              d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/>
+          </svg>
+        </div>
+      </section>
+
+      <!-- MOBILE ONLY: Option 3 Glassmorphic Dashboard Screen (Hidden on Desktop) -->
+      <section class="md:hidden space-y-4">
+        
+        <!-- Welcome Card with 3D Glass Illustration -->
+        <div class="bg-gradient-to-r from-indigo-950/90 via-slate-900 to-purple-950/90 rounded-3xl p-5 border border-indigo-500/30 shadow-2xl relative overflow-hidden flex items-center justify-between gap-3">
+          <div class="space-y-1 z-10 min-w-0 flex-1">
+            <div class="flex items-center gap-1.5">
+              <span class="text-sm">👋</span>
+              <h2 class="text-base font-extrabold text-white tracking-tight">Welcome back!</h2>
+            </div>
+            <p class="text-[11px] text-slate-300 leading-snug">
+              Let's evaluate your data privacy &amp; utility with multi-agent dueling.
+            </p>
+          </div>
+
+          <!-- Glass Analytics Chart Badge -->
+          <div class="shrink-0 h-14 w-14 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-600/30 border border-indigo-500/40 grid place-items-center shadow-lg shadow-indigo-500/20 backdrop-blur-md">
+            <svg class="w-7 h-7 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- "What would you like to do?" Section -->
+        <div class="space-y-2.5">
+          <h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-400 px-1">What would you like to do?</h3>
+
+          <!-- Action Row 1: Upload CSV -->
+          <div id="mobileCsvContainer" class="space-y-2">
+            <input id="mobileFileInput" type="file" accept=".csv,text/csv,text/plain,application/vnd.ms-excel,text/comma-separated-values,application/csv,application/octet-stream" class="hidden" />
+            <label id="mobileCsvCard" for="mobileFileInput" class="p-3.5 rounded-2xl bg-slate-900/80 hover:bg-slate-900 border border-slate-800/80 hover:border-indigo-500/50 shadow-md backdrop-blur-xl flex items-center justify-between gap-3 cursor-pointer transition active:scale-[0.98] group block">
+              <div class="flex items-center gap-3 min-w-0">
+                <div class="h-10 w-10 rounded-xl bg-indigo-500/15 text-indigo-400 grid place-items-center border border-indigo-500/30 text-lg shrink-0 group-hover:scale-105 transition-transform">
+                  <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                </div>
+                <div class="min-w-0">
+                  <h4 class="font-extrabold text-xs text-slate-100 leading-tight">Upload CSV</h4>
+                  <p class="text-[10px] text-slate-400 mt-0.5 truncate">Tap to browse CSV from device</p>
+                </div>
+              </div>
+              <div class="h-7 w-7 rounded-full bg-slate-800/80 group-hover:bg-indigo-600/30 text-slate-400 group-hover:text-white grid place-items-center shrink-0 border border-slate-700/80 transition">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+              </div>
+            </label>
+            <div id="mobileUploadStatus" class="hidden text-xs py-2.5 px-3.5 rounded-xl font-medium border border-slate-800 bg-slate-950/80"></div>
+          </div>
+
+          <!-- Action Row 2: Import from BigQuery -->
+          <div onclick="toggleMobileBqView()" class="p-3.5 rounded-2xl bg-slate-900/80 hover:bg-slate-900 border border-slate-800/80 hover:border-blue-500/50 shadow-md backdrop-blur-xl flex items-center justify-between gap-3 cursor-pointer transition active:scale-[0.98] group">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="h-10 w-10 rounded-xl bg-blue-500/15 text-blue-400 grid place-items-center border border-blue-500/30 text-lg shrink-0 group-hover:scale-105 transition-transform">
+                <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 7v10c0 2.21 3.58 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.58 4 8 4s8-1.79 8-4M4 7c0-2.21 3.58-4 8-4s8 1.79 8 4m0 5c0 2.21-3.58 4-8 4s-8-1.79-8-4"/></svg>
+              </div>
+              <div class="min-w-0">
+                <h4 class="font-extrabold text-xs text-slate-100 leading-tight">Import from BigQuery</h4>
+                <p class="text-[10px] text-slate-400 mt-0.5 truncate">Connect directly to your BigQuery dataset</p>
+              </div>
+            </div>
+            <div class="h-7 w-7 rounded-full bg-slate-800/80 group-hover:bg-blue-600/30 text-slate-400 group-hover:text-white grid place-items-center shrink-0 border border-slate-700/80 transition">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+            </div>
+          </div>
+
+          <!-- Action Row 3: Use Sample Dataset -->
+          <div onclick="toggleMobileSamplesView()" class="p-3.5 rounded-2xl bg-slate-900/80 hover:bg-slate-900 border border-slate-800/80 hover:border-purple-500/50 shadow-md backdrop-blur-xl flex items-center justify-between gap-3 cursor-pointer transition active:scale-[0.98] group">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="h-10 w-10 rounded-xl bg-purple-500/15 text-purple-400 grid place-items-center border border-purple-500/30 text-lg shrink-0 group-hover:scale-105 transition-transform">
+                <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+              </div>
+              <div class="min-w-0">
+                <h4 class="font-extrabold text-xs text-slate-100 leading-tight">Use Sample Dataset</h4>
+                <p class="text-[10px] text-slate-400 mt-0.5 truncate">Explore with pre-loaded demo data</p>
+              </div>
+            </div>
+            <div class="h-7 w-7 rounded-full bg-slate-800/80 group-hover:bg-purple-600/30 text-slate-400 group-hover:text-white grid place-items-center shrink-0 border border-slate-700/80 transition">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mobile BigQuery Connection Glass Panel (Expands when tapped) -->
+        <div id="mobileBqDrawer" class="hidden fade-in bg-slate-950/90 rounded-3xl p-5 border border-blue-500/30 shadow-2xl space-y-3.5">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+            <div class="flex items-center gap-2">
+              <span class="text-base">🔷</span>
+              <h4 class="font-extrabold text-xs text-slate-100">Connect BigQuery</h4>
+            </div>
+            <button type="button" onclick="toggleMobileBqView()" class="h-7 w-7 rounded-lg bg-slate-800 text-slate-400 hover:text-white grid place-items-center text-xs font-bold">✕</button>
+          </div>
+
+          <!-- GCP Service Account IAM Guidance Card (Mobile) -->
+          <div class="relative overflow-hidden rounded-xl p-px" style="background: linear-gradient(135deg, rgba(99,102,241,0.5), rgba(139,92,246,0.3))">
+            <div class="rounded-xl bg-[#0d0f1f] p-3 space-y-2.5">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-1.5">
+                  <div class="w-6 h-6 rounded-lg flex items-center justify-center shrink-0" style="background:linear-gradient(135deg,#4f46e5,#7c3aed)">
+                    <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                  </div>
+                  <span class="text-[11px] font-extrabold text-slate-100">Private GCP Project IAM</span>
+                </div>
+                <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-full border" style="background:rgba(99,102,241,0.15);border-color:rgba(99,102,241,0.35);color:#a5b4fc">IAM Setup</span>
+              </div>
+              <p class="text-[10px] text-slate-300 leading-tight">
+                Grant <strong class="text-white">BigQuery Data Viewer</strong> to SynthGauntlet's Service Account:
+              </p>
+              <div class="rounded-lg overflow-hidden border" style="border-color:rgba(99,102,241,0.3)">
+                <div class="px-2 py-1" style="background:rgba(99,102,241,0.1)">
+                  <span class="text-[9px] font-bold text-indigo-400 uppercase tracking-widest">Service Account</span>
+                </div>
+                <div class="flex items-center gap-1.5 px-2 py-1.5" style="background:rgba(10,11,30,0.9)">
+                  <code class="text-[10px] text-indigo-200 font-mono flex-1 truncate select-all">845643368139-compute@developer.gserviceaccount.com</code>
+                  <button type="button" onclick="copyServiceAccountEmail()" class="px-2 py-1 rounded-md font-bold text-[10px] text-white shrink-0" style="background:linear-gradient(135deg,#4f46e5,#7c3aed)">
+                    Copy
+                  </button>
+                </div>
+              </div>
+              <div class="flex items-center gap-1.5 px-2 py-1 rounded-full border w-fit text-[10px] font-semibold" style="background:rgba(16,185,129,0.08);border-color:rgba(16,185,129,0.25);color:#6ee7b7">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                Role: BigQuery Data Viewer
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label class="text-[10px] font-bold text-slate-300 uppercase tracking-wider block mb-1">GCP Project ID</label>
+            <input id="mobileBqProject" type="text" placeholder="e.g. your-gcp-project-id"
+                   class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 outline-none focus:ring-1 ring-blue-500" />
+          </div>
+          <button id="mobileBqLoadBtn" type="button" onclick="loadMobileBqDatasets()"
+                  class="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md transition text-center">
+            Load Datasets
+          </button>
+          <div id="mobileBqSelects" class="hidden space-y-2 pt-1 border-t border-slate-800">
+            <select id="mobileBqDataset" onchange="onMobileBqDatasetChange()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 outline-none">
+              <option value="">Select dataset...</option>
+            </select>
+            <select id="mobileBqTable" onchange="onMobileBqTableChange()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 outline-none" disabled>
+              <option value="">Select table...</option>
+            </select>
+            <div id="mobileBqTableRowInfo" class="hidden p-3 rounded-xl bg-blue-500/10 border border-blue-500/30 text-[11px]"></div>
+            <button id="mobileBqImportBtn" type="button" onclick="importMobileBqTable()" disabled
+                    class="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition disabled:opacity-40 text-center">
+              Import Selected Table
+            </button>
+          </div>
+          <div id="mobileBqStatus" class="hidden text-xs py-2 px-3 rounded-lg font-semibold border"></div>
+        </div>
+
+        <!-- Mobile Demo Samples Glass Panel (Expands when tapped) -->
+        <!-- Mobile Demo Samples Glass Panel (Expands when tapped) -->
+        <div id="mobileSamplesDrawer" class="hidden fade-in bg-slate-950/90 rounded-3xl p-4 border border-purple-500/30 shadow-2xl space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+            <div class="flex items-center gap-2">
+              <span class="text-base">🧪</span>
+              <h4 class="font-extrabold text-xs text-slate-100">Select Pre-loaded Dataset</h4>
+            </div>
+            <button type="button" onclick="toggleMobileSamplesView()" class="h-7 w-7 rounded-lg bg-slate-800 text-slate-400 hover:text-white grid place-items-center text-xs font-bold">✕</button>
+          </div>
+          <div id="mobileSamplesList" class="space-y-2"></div>
+        </div>
+
+      </section>
+
+      <!-- DESKTOP ONLY: 3 Action Cards (Hidden on Mobile) -->
+      <section class="hidden md:block bg-slate-900/90 rounded-3xl p-6 md:p-8 border border-slate-800 shadow-xl space-y-6">
+        <div>
+          <h3 class="text-xl font-bold text-slate-100 tracking-tight">Import Data</h3>
+          <p class="text-xs text-slate-400 mt-1">Choose how you want to bring your data into SynthGauntlet.</p>
+        </div>
+
+        <div class="grid grid-cols-3 gap-6">
+          <!-- Card 1: Upload CSV -->
+          <div id="uploadCsvCard" class="bg-slate-950/70 hover:bg-slate-950 border border-slate-800 hover:border-indigo-500/60 rounded-2xl p-6 transition-all duration-300 flex flex-col justify-between items-start min-h-[220px] group shadow-md hover:shadow-indigo-500/10">
+            <div class="space-y-3 w-full">
+              <div class="h-12 w-12 rounded-2xl bg-indigo-500/10 text-indigo-400 grid place-items-center border border-indigo-500/20 group-hover:scale-105 transition-transform">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+              </div>
+              <h4 class="font-bold text-slate-100 text-base">Upload CSV</h4>
+              <p class="text-xs text-slate-400 leading-relaxed">Drag & drop your CSV file or browse from device</p>
+            </div>
+            <div id="csvUploadArea" class="mt-6 w-full">
+              <label id="csvUploadLabel" class="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 cursor-pointer transition font-bold text-xs text-white shadow-lg shadow-indigo-600/30">
+                <span>📂</span> Upload CSV
+                <input id="fileInput" type="file" accept=".csv,text/csv,text/plain,application/vnd.ms-excel,text/comma-separated-values,application/csv,application/octet-stream" class="hidden" />
+              </label>
+            </div>
+          </div>
+
+          <!-- Card 2: Import from BigQuery -->
+          <div id="bigQueryCard" class="bg-slate-950/70 hover:bg-slate-955 border border-slate-800 hover:border-indigo-500/60 rounded-2xl p-6 transition-all duration-300 flex flex-col justify-between items-start min-h-[220px] group shadow-md hover:shadow-indigo-500/10">
+            <div class="space-y-3 w-full">
+              <div class="h-12 w-12 rounded-2xl bg-blue-500/10 text-blue-400 grid place-items-center border border-blue-500/20 group-hover:scale-105 transition-transform">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 7v10c0 2.21 3.58 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.58 4 8 4s8-1.79 8-4M4 7c0-2.21 3.58-4 8-4s8 1.79 8 4m0 5c0 2.21-3.58 4-8 4s-8-1.79-8-4"/></svg>
+              </div>
+              <h4 class="font-bold text-slate-100 text-base">Import from BigQuery</h4>
+              <p class="text-xs text-slate-400 leading-relaxed">Connect directly to your BigQuery dataset</p>
+            </div>
+            <div id="bqUploadArea" class="mt-6 w-full">
+              <button id="bqTabBtn" type="button" class="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 cursor-pointer transition font-bold text-xs text-white shadow-lg shadow-indigo-600/30">
+                <span>🔷</span> Connect BigQuery
+              </button>
+            </div>
+          </div>
+
+          <!-- Card 3: Use Sample Dataset -->
+          <div class="bg-slate-950/70 hover:bg-slate-955 border border-slate-800 hover:border-indigo-500/60 rounded-2xl p-6 transition-all duration-300 flex flex-col justify-between items-start min-h-[220px] group shadow-md hover:shadow-indigo-500/10">
+            <div class="space-y-3 w-full">
+              <div class="h-12 w-12 rounded-2xl bg-purple-500/10 text-purple-400 grid place-items-center border border-purple-500/20 group-hover:scale-105 transition-transform">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+              </div>
+              <h4 class="font-bold text-slate-100 text-base">Use Sample Dataset</h4>
+              <p class="text-xs text-slate-400 leading-relaxed">Explore with pre-loaded demo data</p>
+            </div>
+            <a href="#sampleDatasetsSection" onclick="highlightSampleSection(event)" class="mt-6 w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 cursor-pointer transition font-bold text-xs text-white shadow-lg shadow-indigo-600/30">
+              <span>🧪</span> Select Sample
+            </a>
+          </div>
+        </div>
+
+        <div id="uploadStatus" class="hidden text-xs mt-3"></div>
+
+        <!-- BigQuery Connection Drawer Panel (Desktop) -->
+        <div id="bqPanel" class="hidden mt-6 fade-in border border-indigo-800/60 rounded-3xl p-7 md:p-9 bg-slate-950/95 shadow-2xl relative overflow-hidden">
+          <div class="flex items-center justify-between pb-4 mb-6 border-b border-slate-800">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="h-10 w-10 rounded-xl bg-blue-500/20 text-blue-400 grid place-items-center border border-blue-500/30 text-lg font-bold shrink-0">
+                🔷
+              </div>
+              <div class="min-w-0">
+                <h3 class="font-extrabold text-base text-slate-100 tracking-tight truncate">BigQuery Connection</h3>
+                <p class="text-xs text-slate-400 truncate">Connect and import data securely from Google BigQuery</p>
+              </div>
+            </div>
+            <button id="bqCloseBtn" type="button" title="Close & reset connection form"
+              class="h-8 w-8 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white grid place-items-center transition font-bold text-sm shrink-0 ml-2">
+              ✕
+            </button>
+          </div>
+
+          <div class="space-y-6">
+            <!-- GCP Service Account IAM Guidance Card (Desktop) -->
+            <div class="relative overflow-hidden rounded-2xl p-px" style="background: linear-gradient(135deg, rgba(99,102,241,0.5) 0%, rgba(139,92,246,0.3) 50%, rgba(59,130,246,0.4) 100%)">
+              <div class="relative rounded-2xl bg-[#0d0f1f] p-5 space-y-4 overflow-hidden">
+                <!-- Background glow -->
+                <div class="absolute -top-8 -right-8 w-40 h-40 rounded-full opacity-[0.07]" style="background: radial-gradient(circle, #818cf8, transparent 70%)"></div>
+
+                <!-- Header -->
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style="background: linear-gradient(135deg, #4f46e5, #7c3aed)">
+                      <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                    </div>
+                    <div>
+                      <p class="text-sm font-extrabold text-white leading-tight">External GCP Project Access</p>
+                      <p class="text-[10px] text-indigo-400 font-medium">One-time IAM setup required</p>
+                    </div>
+                  </div>
+                  <span class="px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide border" style="background: rgba(99,102,241,0.15); border-color: rgba(99,102,241,0.35); color: #a5b4fc">Enterprise IAM</span>
+                </div>
+
+                <!-- Steps -->
+                <div class="space-y-2.5">
+                  <!-- Step 1 -->
+                  <div class="flex items-start gap-3">
+                    <div class="w-5 h-5 rounded-full shrink-0 flex items-center justify-center text-[10px] font-black text-white mt-0.5" style="background: linear-gradient(135deg,#4f46e5,#7c3aed)">1</div>
+                    <p class="text-[11px] text-slate-300 leading-relaxed pt-0.5">Copy SynthGauntlet's Service Account email below.</p>
+                  </div>
+                  <!-- Step 2 -->
+                  <div class="flex items-start gap-3">
+                    <div class="w-5 h-5 rounded-full shrink-0 flex items-center justify-center text-[10px] font-black text-white mt-0.5" style="background: linear-gradient(135deg,#4f46e5,#7c3aed)">2</div>
+                    <p class="text-[11px] text-slate-300 leading-relaxed pt-0.5">In your <strong class="text-white">Google Cloud IAM Console</strong>, add this email as a principal and grant it the <strong class="text-white">BigQuery Data Viewer</strong> role.</p>
+                  </div>
+                  <!-- Step 3 -->
+                  <div class="flex items-start gap-3">
+                    <div class="w-5 h-5 rounded-full shrink-0 flex items-center justify-center text-[10px] font-black text-white mt-0.5" style="background: linear-gradient(135deg,#4f46e5,#7c3aed)">3</div>
+                    <p class="text-[11px] text-slate-300 leading-relaxed pt-0.5">Enter your Project ID below and click <strong class="text-white">Load Datasets</strong>.</p>
+                  </div>
+                </div>
+
+                <!-- Email copy box -->
+                <div class="rounded-xl overflow-hidden border" style="border-color: rgba(99,102,241,0.3); background: rgba(10,11,30,0.9)">
+                  <div class="flex items-center gap-1.5 px-3 py-1.5 border-b" style="border-color: rgba(99,102,241,0.2); background: rgba(99,102,241,0.07)">
+                    <svg class="w-3 h-3 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207"/></svg>
+                    <span class="text-[9px] font-bold text-indigo-400 uppercase tracking-widest">Service Account Email</span>
+                  </div>
+                  <div class="flex items-center gap-2 px-3 py-2.5">
+                    <code id="bqServiceAccountEmail" class="text-xs text-indigo-200 font-mono flex-1 select-all break-all">845643368139-compute@developer.gserviceaccount.com</code>
+                    <button type="button" onclick="copyServiceAccountEmail()" id="copySaBtn"
+                      class="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-[11px] text-white transition-all duration-200 cursor-pointer"
+                      style="background: linear-gradient(135deg, #4f46e5, #7c3aed); box-shadow: 0 0 12px rgba(99,102,241,0.4)">
+                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                      <span id="copySaText">Copy Email</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Footer badges -->
+                <div class="flex flex-wrap items-center gap-2 pt-0.5">
+                  <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-semibold" style="background:rgba(16,185,129,0.08); border-color:rgba(16,185,129,0.25); color:#6ee7b7">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    Role: BigQuery Data Viewer
+                  </div>
+                  <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-semibold" style="background:rgba(59,130,246,0.08); border-color:rgba(59,130,246,0.25); color:#93c5fd">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    <code class="font-mono">bigquery-public-data</code> — zero setup
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="space-y-1.5">
+              <label class="text-xs font-extrabold text-slate-200 uppercase tracking-wider block">GCP Project ID</label>
+              <p class="text-[11px] text-slate-400">Enter the Google Cloud project ID containing your BigQuery data.</p>
+              <input id="bqProject" type="text" placeholder="e.g. bigquery-public-data"
+                class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 ring-indigo-500 text-slate-100 placeholder-slate-500 transition" />
+            </div>
+
+            <div class="space-y-2 pt-2 border-t border-slate-800/60">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <label class="text-xs font-extrabold text-slate-200 uppercase tracking-wider block">Load available datasets</label>
+                  <p class="text-[11px] text-slate-400 mt-0.5">After entering your Project ID, load the datasets available in that project.</p>
+                </div>
+                <button id="bqLoadDatasets" type="button" class="text-xs px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition shadow-md shadow-indigo-600/30 shrink-0">
+                  Load Datasets
+                </button>
+              </div>
+            </div>
+
+            <div class="space-y-1.5">
+              <label class="text-xs font-extrabold text-slate-200 uppercase tracking-wider block">Select Dataset</label>
+              <p class="text-[11px] text-slate-400">Select a dataset to load its available tables.</p>
+              <select id="bqDataset" class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 ring-indigo-500 text-slate-100 disabled:opacity-50 transition" disabled>
+                <option value="">Enter a Project ID and click "Load Datasets" to continue</option>
+              </select>
+            </div>
+
+            <div class="space-y-1.5">
+              <label class="text-xs font-extrabold text-slate-200 uppercase tracking-wider block">Select Table</label>
+              <p class="text-[11px] text-slate-400">Select the table you want to import.</p>
+              <select id="bqTable" class="w-full bg-slate-900 border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 ring-indigo-500 text-slate-100 disabled:opacity-50 transition" disabled>
+                <option value="">Select a dataset first</option>
+              </select>
+            </div>
+
+            <!-- Table Row Detection Info (Desktop) -->
+            <div id="bqTableRowInfo" class="hidden p-3.5 rounded-xl bg-blue-500/10 border border-blue-500/30 text-xs"></div>
+
+            <div id="bqStatus" class="hidden text-xs py-2.5 px-4 rounded-xl font-semibold border transition"></div>
+
+            <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+              <button id="bqCancelBtn" type="button" class="text-xs px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold transition border border-slate-700 text-center">
+                Cancel
+              </button>
+              <button id="bqImportBtn" type="button" class="text-xs px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition disabled:opacity-40 shadow-lg shadow-emerald-600/20 text-center" disabled>
+                Import Selected Table
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Pre-loaded Sample Datasets Section (Desktop) -->
+      <section id="sampleDatasetsSection" class="hidden md:block bg-slate-900/90 rounded-3xl p-6 md:p-8 border border-slate-800 shadow-xl space-y-6 transition-all duration-300">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <h3 class="text-xl font-bold text-slate-100 tracking-tight flex items-center gap-2">
+              <span class="text-indigo-400">🧪</span> Want to explore first?
+            </h3>
+            <p class="text-xs text-slate-400 mt-1">Try one of our pre-loaded sample datasets.</p>
+          </div>
+          <button id="sampleCollapseBtn" onclick="toggleSampleSection()"
+                  class="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 text-slate-400 hover:text-slate-200 text-[11px] font-semibold transition mt-1">
+            <svg id="sampleChevron" class="w-3.5 h-3.5 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M5 15l7-7 7 7"/>
+            </svg>
+            <span id="sampleCollapseLabel">Collapse</span>
+          </button>
+        </div>
+        
+        <div id="sampleGridWrapper">
+          <div id="sampleGrid" class="grid grid-cols-3 gap-4"></div>
+        </div>
+      </section>
+
+      <!-- Auto-detected Columns Tweaking Configuration (Appears upon CSV / BQ / Sample Ingestion) -->
+      <section id="uploadConfig" class="hidden bg-slate-900/95 rounded-3xl p-6 md:p-8 border border-indigo-800/60 fade-in shadow-xl space-y-6">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">🧩</span>
+          <h3 class="font-bold text-slate-100 text-lg">We auto-detected your columns &mdash; confirm or tweak</h3>
+          <span id="uploadMeta" class="ml-auto text-xs text-slate-400 font-medium"></span>
+        </div>
+        <div class="grid md:grid-cols-2 gap-6">
+          <div>
+            <label class="text-xs font-bold uppercase tracking-wider text-slate-400">Prediction target (label)</label>
+            <select id="labelSelect" class="mt-2 w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm font-semibold outline-none focus:ring-2 ring-indigo-500 text-slate-100"></select>
+            <p class="text-xs text-slate-500 mt-2">Used to prove utility (train-on-synthetic, test-on-real).</p>
+          </div>
+          <div>
+            <label class="text-xs font-bold uppercase tracking-wider text-slate-400">Quasi-identifiers (attack surface)</label>
+            <div id="qiChips" class="mt-2 flex flex-wrap gap-2 max-h-36 overflow-y-auto scroll pr-1"></div>
+            <p class="text-xs text-slate-500 mt-2">Columns an attacker could use to re-identify people. Click to toggle.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Evaluation Tuning & Controls -->
+      <section id="evaluationSection" class="bg-slate-900/95 rounded-2xl sm:rounded-3xl p-5 sm:p-6 md:p-8 border border-slate-800 shadow-xl space-y-4">
+        
+        <!-- Detected Source Rows Alert Banner (Appears when any dataset is loaded) -->
+        <div id="datasetRowNotice" class="hidden fade-in flex items-start sm:items-center justify-between gap-3.5 p-4 rounded-2xl bg-amber-500/10 border-2 border-amber-500/40 text-xs shadow-lg shadow-amber-500/10 backdrop-blur-md">
+          <div class="flex items-center gap-3.5 min-w-0">
+            <div class="h-9 w-9 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-400 grid place-items-center text-lg shrink-0 shadow-sm shadow-amber-500/20">
+              📊
+            </div>
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-1.5">
+                <span class="font-bold text-amber-100 text-xs">Source dataset loaded:</span>
+                <span id="detectedRowsText" class="font-black text-amber-300 text-xs tracking-wide">0 rows detected</span>
+              </div>
+              <p class="text-[11.5px] text-amber-200/80 font-medium mt-0.5">Please enter below the number of synthetic rows you want to forge.</p>
+            </div>
+          </div>
+          <span id="sourceTypeBadge" class="px-3 py-1 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10px] font-black uppercase tracking-wider shrink-0 shadow-sm shadow-amber-500/20">Ready</span>
+        </div>
+
+        <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-6 pt-1">
+          <div class="space-y-1">
+            <h3 class="text-base sm:text-lg font-bold text-slate-100 flex items-center gap-2">
+              <span>⚙️</span> Evaluation Settings
+            </h3>
+            <p class="text-[11px] sm:text-xs text-slate-400">Configure size limits and parameters for the adversarial synthesis pass.</p>
+          </div>
+
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+            <div class="space-y-1.5 w-full sm:w-auto">
+              <div class="flex items-center justify-between gap-2">
+                <label for="nRows" class="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                  <span>Rows to forge</span>
+                  <span class="text-rose-400">*</span>
+                </label>
+                <span id="nRowsLimitHelper" class="text-[10px] font-mono text-slate-400">Min: <span id="minRowsVal">500</span> · Max: 10,000</span>
+              </div>
+              <input id="nRows" type="number" placeholder="Enter row count (500 – 10,000)" min="500" max="10000" step="100"
+                     class="w-full sm:w-64 bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-semibold outline-none focus:ring-2 ring-indigo-500 text-slate-100 placeholder:text-slate-500 transition" />
+              <div id="nRowsError" class="hidden text-[11px] text-rose-400 font-semibold flex items-center gap-1 mt-1"></div>
+            </div>
+
+            <button id="runBtn" disabled
+                    class="mt-1 sm:mt-5 md:mt-0 w-full sm:w-auto bg-gradient-to-r from-indigo-500 via-purple-600 to-fuchsia-600 hover:opacity-95 active:scale-[0.98] transition rounded-xl px-7 py-3.5 font-extrabold text-sm text-white shadow-xl shadow-indigo-600/30 glow disabled:opacity-40 disabled:cursor-not-allowed text-center flex items-center justify-center gap-2">
+              <span>✨</span> <span id="runBtnText">Forge Synthetic Data</span>
+            </button>
+
+            <button id="abortBtn" type="button" onclick="promptAbortRun()"
+                    class="hidden mt-1 sm:mt-5 md:mt-0 w-full sm:w-auto bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/40 hover:border-rose-400/60 text-rose-300 hover:text-rose-200 transition rounded-xl px-6 py-3.5 font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg shadow-rose-600/20 cursor-pointer">
+              <span>🛑</span> Abort Execution
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Difficulty Banner -->
+      <div id="difficultyBanner" class="hidden rounded-3xl p-5 border fade-in"></div>
+
+      <!-- Agent Cast Stream -->
+      <section id="castSection" class="hidden space-y-4">
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-bold text-slate-100">The Adversarial Agents</h3>
+          <span id="roundPill" class="text-xs px-3.5 py-1 rounded-full bg-slate-800 text-slate-300 font-bold border border-slate-700">Round 0</span>
+        </div>
+        <div id="cast" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4"></div>
+      </section>
+
+      <!-- Live Metrics Section -->
+      <section id="metricsSection" class="hidden grid md:grid-cols-2 gap-6">
+        <div class="bg-slate-900/90 rounded-3xl p-6 border border-slate-800 shadow-xl space-y-3">
+          <h4 class="text-sm font-bold text-emerald-400 uppercase tracking-wide flex items-center gap-1.5">
+            <span>📏</span> Utility Benchmarks (Want HIGH)
+          </h4>
+          <div id="mUtility"></div>
+          <div id="mFidelity" class="mt-3"></div>
+          <div id="mQuery" class="mt-3"></div>
+        </div>
+        <div class="bg-slate-900/90 rounded-3xl p-6 border border-slate-800 shadow-xl space-y-3">
+          <h4 class="text-sm font-bold text-rose-400 uppercase tracking-wide flex items-center gap-1.5">
+            <span>🛡️</span> Privacy Leakage (Want LOW)
+          </h4>
+          <div id="mReid"></div>
+          <div id="mMembership" class="mt-3"></div>
+        </div>
+      </section>
+
+      <!-- Live Activity Log & Rounds Table -->
+      <section id="liveSection" class="hidden grid md:grid-cols-2 gap-6">
+        <div class="bg-slate-900/90 rounded-3xl p-6 border border-slate-800 shadow-xl">
+          <h4 class="text-sm font-bold text-slate-100 mb-4">Live Activity Stream</h4>
+          <div id="log" class="scroll space-y-2 text-xs max-h-80 overflow-y-auto pr-1"></div>
+        </div>
+        <div class="bg-slate-900/90 rounded-3xl border border-slate-800 overflow-hidden shadow-xl">
+          <h4 class="text-sm font-bold p-6 pb-3 text-slate-100">The Duel, Round by Round</h4>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs">
+              <thead class="text-slate-400 bg-slate-950 border-y border-slate-800">
+                <tr>
+                  <th class="text-left px-4 py-2.5 font-bold">Round</th>
+                  <th class="text-right px-4 py-2.5 font-bold">Utility</th>
+                  <th class="text-right px-4 py-2.5 font-bold">Fidelity</th>
+                  <th class="text-right px-4 py-2.5 font-bold">Re-ID</th>
+                  <th class="text-right px-4 py-2.5 font-bold">Member.</th>
+                  <th class="text-center px-4 py-2.5 font-bold">Gate</th>
+                </tr>
+              </thead>
+              <tbody id="roundsBody" class="divide-y divide-slate-800/80"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Scorecard Section -->
+      <section id="scorecardSection" class="hidden space-y-5">
+
+        <!-- Unified Metrics Box: both panels side by side -->
+        <div class="bg-slate-900/90 rounded-3xl border border-slate-800 shadow-xl overflow-hidden">
+          <div class="px-6 pt-5 pb-4 border-b border-slate-800 flex items-center gap-2">
+            <span class="text-base font-extrabold text-slate-100">Dual Scorecard</span>
+            <span class="text-xs text-slate-500 font-medium ml-1">— adversarial evaluation results</span>
+          </div>
+          <div class="grid md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-800">
+            <!-- Utility Panel -->
+            <div class="p-6 space-y-3">
+              <div class="flex items-center justify-between mb-1">
+                <span class="font-bold text-emerald-400 text-xs uppercase tracking-wider">📏 Useful (Fidelity & Utility)</span>
+                <span class="text-[10px] text-slate-500 font-medium">Proven by Math</span>
+              </div>
+              <div id="usefulCards" class="space-y-3"></div>
+            </div>
+            <!-- Privacy Panel -->
+            <div class="p-6 space-y-3">
+              <div class="flex items-center justify-between mb-1">
+                <span class="font-bold text-rose-400 text-xs uppercase tracking-wider">🛡️ Safe (Privacy Attacks)</span>
+                <span class="text-[10px] text-slate-500 font-medium">Proven by Attack</span>
+              </div>
+              <div id="safeCards" class="space-y-3"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Plain-English Verdict Banner -->
+        <div id="verdictBanner" class="rounded-3xl p-6 border shadow-2xl">
+          <div class="flex flex-col sm:flex-row sm:items-center gap-5">
+            <!-- Icon + Message -->
+            <div class="flex items-start gap-4 flex-1">
+              <div id="verdictIcon" class="text-4xl shrink-0 leading-none mt-0.5">✅</div>
+              <div class="space-y-1">
+                <div class="flex items-center gap-2.5 flex-wrap">
+                  <h3 id="verdictHeadline" class="text-lg font-extrabold text-white leading-tight">Synthetic data is safe to use</h3>
+                  <span id="verdictBadge" class="px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 uppercase tracking-wide">SUCCESS</span>
+                </div>
+                <p id="verdictDetail" class="text-sm text-slate-300 leading-relaxed max-w-xl">All utility and privacy release gates passed. This dataset is certified safe for sharing, modelling, and research.</p>
+              </div>
+            </div>
+            <!-- Actions Stack -->
+            <div class="flex flex-col gap-2 shrink-0 w-full sm:w-60">
+              <a id="topDownloadBtn" href="#" download
+                 class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs shadow-md shadow-emerald-500/20 transition transform hover:-translate-y-0.5 text-center">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                <span>Download Synthetic CSV</span>
+              </a>
+              <button id="topBqExportBtn" type="button" onclick="openBqExportModal()"
+                 class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 hover:border-blue-400 text-blue-300 hover:text-white font-bold text-xs shadow-sm transition transform hover:-translate-y-0.5 text-center cursor-pointer">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 7v10c0 2.21 3.58 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.58 4 8 4s8-1.79 8-4M4 7c0-2.21 3.58-4 8-4s8 1.79 8 4m0 5c0 2.21-3.58 4-8 4s-8-1.79-8-4"/></svg>
+                <span>Export to BigQuery</span>
+              </button>
+              <button id="newAnalysisBtn" onclick="startNewAnalysis()"
+                 class="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/80 hover:border-slate-600 text-slate-400 hover:text-slate-200 font-semibold text-xs transition text-center cursor-pointer">
+                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M3 12a9 9 0 019-9 9.75 9.75 0 016.74 2.74L21 8M21 3v5h-5M21 12a9 9 0 01-9 9 9.75 9.75 0 01-6.74-2.74L3 16M3 21v-5h5"/></svg>
+                <span>Start New Analysis</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Technical log (collapsed) -->
+        <div class="p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-slate-900/90 border border-slate-800 shadow-xl">
+          <details>
+            <summary class="cursor-pointer text-xs font-semibold text-slate-400 hover:text-slate-200 flex items-center gap-2 select-none">
+              <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              View Full Technical Report
+            </summary>
+            <pre id="scorecardText" class="mt-4 p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-950 text-xs font-mono text-slate-300 leading-relaxed overflow-x-auto border border-slate-800"></pre>
+          </details>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Abort Confirmation Modal -->
+  <div id="abortModal" onclick="if(event.target===this) closeAbortModal()" class="fixed inset-0 top-0 left-0 right-0 bottom-0 w-screen h-screen z-[9999] flex items-center justify-center bg-slate-950/80 backdrop-blur-md hidden fade-in p-3 sm:p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-5 sm:p-6 max-w-md w-full shadow-2xl space-y-4 sm:space-y-5 modal-card">
+      <div class="flex items-center justify-between gap-3">
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="h-10 w-10 sm:h-11 sm:w-11 rounded-xl sm:rounded-2xl bg-rose-500/10 text-rose-400 grid place-items-center font-bold text-lg sm:text-xl border border-rose-500/30 shrink-0">
+            ⚠️
+          </div>
+          <div class="min-w-0">
+            <h3 class="text-sm sm:text-base font-extrabold text-slate-100 leading-tight truncate">Abort Execution?</h3>
+            <p class="text-[11px] sm:text-xs text-rose-400/90 font-medium truncate">Warning: Unsaved run progress will be lost</p>
+          </div>
+        </div>
+        <button onclick="closeAbortModal()" type="button" class="h-8 w-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white grid place-items-center text-sm font-bold shrink-0">✕</button>
+      </div>
+      <p class="text-xs text-slate-300 leading-relaxed font-medium bg-slate-950/60 p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-800/80">
+        Are you sure you want to abort the execution? All active progress will be cancelled, no synthetic data will be generated or saved, and the run will be completely terminated.
+      </p>
+      <div class="flex items-center justify-end gap-2.5 sm:gap-3 pt-1">
+        <button id="abortCancelBtn" onclick="closeAbortModal()" type="button"
+                class="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-semibold text-xs transition cursor-pointer text-center">
+          Resume Run
+        </button>
+        <button id="abortConfirmBtn" onclick="confirmAbortRun()" type="button"
+                class="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-lg shadow-rose-600/30 transition flex items-center justify-center gap-1.5 cursor-pointer text-center">
+          <span>🛑</span> Yes, Abort Run
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Clean History Session Report Modal (Read-Only) -->
+  <div id="historyReportModal" onclick="if(event.target===this) closeHistoryReportModal()" class="fixed inset-0 top-0 left-0 right-0 bottom-0 w-screen h-screen z-[9999] flex items-center justify-center bg-slate-950/80 backdrop-blur-md hidden fade-in p-3 sm:p-4 md:p-6">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 max-w-2xl w-full shadow-2xl space-y-4 sm:space-y-6 relative max-h-[88vh] sm:max-h-[90vh] flex flex-col modal-card overflow-hidden">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3.5 sm:pb-4 shrink-0 gap-2">
+        <div class="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+          <span id="historyReportIcon" class="text-xl sm:text-2xl shrink-0">📜</span>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <h3 id="historyReportTitle" class="text-sm sm:text-base font-extrabold text-slate-100 leading-tight truncate">Session History Report</h3>
+              <span id="historyReportSessionId" class="text-[9px] sm:text-[10px] px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-mono border border-indigo-500/30 uppercase tracking-wider font-bold">SESSION-8F32A9</span>
+            </div>
+            <p id="historyReportSubtitle" class="text-[11px] sm:text-xs text-slate-400 mt-0.5 font-medium truncate"></p>
+          </div>
+        </div>
+        <button onclick="closeHistoryReportModal()" type="button" title="Close report"
+                class="h-8 w-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white grid place-items-center text-sm font-bold shrink-0 transition">
+          ✕
+        </button>
+      </div>
+
+      <!-- Modal Body (Scrollable) -->
+      <div id="historyReportBody" class="overflow-y-auto overscroll-contain scroll pr-1 space-y-4 sm:space-y-5 flex-1 min-h-0 text-xs text-slate-300">
+        <!-- Dynamically populated -->
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="flex items-center justify-between border-t border-slate-800 pt-3.5 sm:pt-4 shrink-0">
+        <span class="text-[10px] sm:text-[11px] text-slate-500 font-mono flex items-center gap-1">🔒 <span>Read-Only Record</span></span>
+        <button onclick="closeHistoryReportModal()" type="button"
+                class="px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition cursor-pointer">
+          Close Report
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BigQuery Export Modal -->
+  <div id="bqExportModal" onclick="if(event.target===this) closeBqExportModal()" class="fixed inset-0 top-0 left-0 right-0 bottom-0 w-screen h-screen z-[9999] flex items-center justify-center bg-slate-950/80 backdrop-blur-md hidden fade-in p-3 sm:p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-5 sm:p-6 max-w-lg w-full shadow-2xl space-y-4 sm:space-y-5 modal-card">
+      <div class="flex items-center justify-between gap-3 border-b border-slate-800 pb-3.5">
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="h-10 w-10 sm:h-11 sm:w-11 rounded-xl sm:rounded-2xl bg-blue-500/10 text-blue-400 grid place-items-center font-bold text-lg sm:text-xl border border-blue-500/30 shrink-0">
+            🔷
+          </div>
+          <div class="min-w-0">
+            <h3 class="text-sm sm:text-base font-extrabold text-slate-100 leading-tight truncate">Export to BigQuery</h3>
+            <p class="text-[11px] sm:text-xs text-slate-400 font-medium truncate">Write synthesized DataFrame directly to a BigQuery table</p>
+          </div>
+        </div>
+        <button onclick="closeBqExportModal()" type="button" class="h-8 w-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white grid place-items-center text-sm font-bold shrink-0 transition cursor-pointer">✕</button>
+      </div>
+
+      <input type="hidden" id="bqExportRunId" value="">
+
+      <div class="space-y-3.5 text-xs text-slate-300">
+        <!-- Project Input -->
+        <div class="space-y-1.5">
+          <label class="block font-bold text-slate-200 text-xs">Target GCP Project ID <span class="text-rose-400">*</span></label>
+          <input id="bqExportProject" type="text" placeholder="e.g. my-gcp-project"
+                 class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700/80 text-slate-100 font-mono text-xs focus:outline-none focus:border-blue-500 transition">
+          <p class="text-[10px] text-slate-400">Google Cloud project where your dataset and table reside.</p>
+        </div>
+
+        <!-- Dataset Input -->
+        <div class="space-y-1.5">
+          <label class="block font-bold text-slate-200 text-xs">BigQuery Dataset <span class="text-rose-400">*</span></label>
+          <input id="bqExportDataset" type="text" placeholder="e.g. my_dataset"
+                 class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700/80 text-slate-100 font-mono text-xs focus:outline-none focus:border-blue-500 transition">
+          <p class="text-[10px] text-slate-400">Dataset will be automatically created if it does not exist.</p>
+        </div>
+
+        <!-- Table Input -->
+        <div class="space-y-1.5">
+          <label class="block font-bold text-slate-200 text-xs">Destination Table Name <span class="text-rose-400">*</span></label>
+          <input id="bqExportTable" type="text" placeholder="e.g. synthetic_dataset_export"
+                 class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700/80 text-slate-100 font-mono text-xs focus:outline-none focus:border-blue-500 transition">
+          <p class="text-[10px] text-slate-400">Table will be created or overwritten with write disposition WRITE_TRUNCATE.</p>
+        </div>
+
+        <!-- Status / Message Banner -->
+        <div id="bqExportStatus" class="hidden p-3.5 rounded-xl border text-xs space-y-1"></div>
+      </div>
+
+      <div class="flex items-center justify-end pt-2 border-t border-slate-800">
+        <button id="bqExportSubmitBtn" onclick="executeBqExport()" type="button"
+                class="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs shadow-lg shadow-blue-600/30 transition flex items-center justify-center gap-1.5 cursor-pointer">
+          <span>🚀</span> Export to BigQuery
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Help & Documentation Modal -->
+  <div id="helpModal" onclick="if(event.target===this) closeHelpModal()" class="fixed inset-0 top-0 left-0 right-0 bottom-0 w-screen h-screen z-[9999] flex items-center justify-center bg-slate-950/80 backdrop-blur-md hidden fade-in p-3 sm:p-6">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-7 max-w-2xl w-full max-h-[88vh] sm:max-h-[85vh] flex flex-col shadow-2xl space-y-4 sm:space-y-5 relative overflow-hidden modal-card">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between pb-3.5 sm:pb-4 border-b border-slate-800 shrink-0 gap-2">
+        <div class="flex items-center gap-2.5 sm:gap-3 min-w-0">
+          <div class="h-9 w-9 sm:h-10 sm:w-10 rounded-xl sm:rounded-2xl bg-indigo-500/10 text-indigo-400 grid place-items-center font-bold text-lg sm:text-xl border border-indigo-500/20 shrink-0">
+            📚
+          </div>
+          <div class="min-w-0">
+            <h3 class="text-sm sm:text-lg font-extrabold text-slate-100 leading-tight truncate">SynthGauntlet Docs</h3>
+            <p class="text-[11px] sm:text-xs text-slate-400 truncate">Multi-agent privacy & utility guide</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeHelpModal()" title="Close documentation"
+                class="h-8 w-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white grid place-items-center transition font-bold text-sm cursor-pointer shrink-0">
+          ✕
+        </button>
+      </div>
+
+      <!-- Modal Body (Scrollable) -->
+      <div class="overflow-y-auto overscroll-contain scroll pr-2 space-y-5 flex-1 text-xs text-slate-300">
+        
+        <!-- Privacy Boundary & Zero-Leakage Guarantee -->
+        <div class="bg-indigo-950/40 p-4 sm:p-5 rounded-2xl border border-indigo-500/30 space-y-2.5 shadow-inner">
+          <div class="flex items-center justify-between">
+            <h4 class="font-extrabold text-indigo-300 text-sm flex items-center gap-2">
+              <span>🛡️</span> Privacy Boundary & Security Guarantees
+            </h4>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-200 border border-indigo-500/40">Enterprise Compliance</span>
+          </div>
+          <p class="leading-relaxed text-slate-300 text-[11px]">
+            • <strong>Zero Raw Row Transmission</strong>: Sensitive raw records are <em>NEVER</em> passed to any LLM prompt. Only anonymized statistical aggregates, column marginals, covariance matrices, and diagnostic deltas reach Gemini.<br>
+            • <strong>Deterministic Verification Gate</strong>: The LLM never grades its own work. All release gates, Kolmogorov-Smirnov distances, and attack breach metrics are computed 100% deterministically by mathematical code.
+          </p>
+        </div>
+
+        <!-- Quick Start Guide -->
+        <div class="bg-slate-950/60 p-4 sm:p-5 rounded-2xl border border-slate-800/80 space-y-2.5">
+          <h4 class="font-extrabold text-indigo-400 text-sm flex items-center gap-2">
+            <span>🚀</span> How to Use SynthGauntlet
+          </h4>
+          <ol class="list-decimal list-inside space-y-1.5 leading-relaxed text-slate-300 text-[11px]">
+            <li><strong>Import Data</strong>: Upload any CSV file (up to 50,000 rows / 15 MB), connect a Google BigQuery table (from 350+ public or private datasets), or pick a pre-loaded benchmark sample.</li>
+            <li><strong>Inspect & Configure Columns</strong>: The Semantic Profiler automatically infers functional dependencies, business constraints, Quasi-Identifiers (the attack surface), and the target Label column. Tweak selections if needed.</li>
+            <li><strong>Forge & Attack</strong>: Click <em>Forge Synthetic Data</em> to launch the multi-agent adversarial gauntlet. Watch live rounds as agents explore multi-candidate Pareto strategies.</li>
+            <li><strong>Download & Export</strong>: Once Arbiter approves release, download your synthetic CSV or export directly to a Google BigQuery table with 1-click.</li>
+          </ol>
+        </div>
+
+        <!-- The Adversarial Agent Cast -->
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <h4 class="font-extrabold text-slate-100 text-sm flex items-center gap-2">
+              <span>🤖</span> The Adversarial Agent Cast
+            </h4>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/30">Google Cloud Vertex AI & Deterministic Math</span>
+          </div>
+          <div class="grid sm:grid-cols-2 gap-3">
+            <div class="p-3.5 rounded-2xl bg-slate-950/50 border border-indigo-500/20 hover:border-indigo-500/40 transition">
+              <div class="flex items-center justify-between">
+                <p class="font-bold text-indigo-400 text-xs">⚗️ Forge (Synthesizer)</p>
+                <span class="text-[9px] font-mono text-indigo-300/70 bg-indigo-500/10 px-1.5 py-0.5 rounded">Generator</span>
+              </div>
+              <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">Runs <strong>Beam-Search Multi-Candidate Generation</strong> proposing 3 diverse plans per round along the Pareto frontier. Employs dependency-aware grouped sampling, copula rank preservation, and domain bound clamping.</p>
+            </div>
+            <div class="p-3.5 rounded-2xl bg-slate-950/50 border border-emerald-500/20 hover:border-emerald-500/40 transition">
+              <div class="flex items-center justify-between">
+                <p class="font-bold text-emerald-400 text-xs">📏 Auditor (Utility Auditor)</p>
+                <span class="text-[9px] font-mono text-emerald-300/70 bg-emerald-500/10 px-1.5 py-0.5 rounded">Evaluator</span>
+              </div>
+              <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">Computes 2-sample Kolmogorov-Smirnov distances, Total Variation, correlation divergence ($|\Delta r| \ge 0.15$ broken relationships), SQL query equivalence, and Train-on-Synthetic Test-on-Real (TSTR) ML utility.</p>
+            </div>
+            <div class="p-3.5 rounded-2xl bg-slate-950/50 border border-rose-500/20 hover:border-rose-500/40 transition">
+              <div class="flex items-center justify-between">
+                <p class="font-bold text-rose-400 text-xs">🕵️ Challenger (Privacy Attacker)</p>
+                <span class="text-[9px] font-mono text-rose-300/70 bg-rose-500/10 px-1.5 py-0.5 rounded">Adversary</span>
+              </div>
+              <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">Executes an <strong>Adaptive Multi-Pass Tool Loop</strong> (Pass 1 broad attack surface, Pass 2 focused adaptive follow-up) probing nearest-neighbor DCR linkage, shadow Membership Inference (MIA), and outlier attacks.</p>
+            </div>
+            <div class="p-3.5 rounded-2xl bg-slate-950/50 border border-amber-500/20 hover:border-amber-500/40 transition">
+              <div class="flex items-center justify-between">
+                <p class="font-bold text-amber-400 text-xs">⚖️ Arbiter (Orchestrator)</p>
+                <span class="text-[9px] font-mono text-amber-300/70 bg-amber-500/10 px-1.5 py-0.5 rounded">Judge</span>
+              </div>
+              <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">Enforces mathematical release gates and <strong>Pareto candidate selection</strong>. Tracks multi-round state via a <code>RunBlackboard</code> to diagnose root causes and advise Forge, driving convergence within 5 rounds.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mathematical Release Gates -->
+        <div class="bg-slate-950/60 p-4 sm:p-5 rounded-2xl border border-slate-800/80 space-y-3">
+          <div class="flex items-center justify-between">
+            <h4 class="font-extrabold text-emerald-400 text-sm flex items-center gap-2">
+              <span>🛡️</span> Mathematical Release Gates & Verification
+            </h4>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">Dual-Scorecard Thresholds</span>
+          </div>
+          <p class="text-slate-400 text-[11px] leading-relaxed">
+            Data is only approved for release if it simultaneously passes all strict utility benchmarks AND satisfies rigorous privacy ceilings:
+          </p>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-[10px] font-mono">
+            <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
+              <div>
+                <span class="text-slate-400 block font-sans font-bold text-xs">Distribution Fidelity</span>
+                <span class="text-[9px] text-slate-500">KS-Test + Total Variation</span>
+              </div>
+              <span class="text-emerald-400 font-bold text-sm mt-2">≥ 82.0%</span>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
+              <div>
+                <span class="text-slate-400 block font-sans font-bold text-xs">TSTR ML Utility</span>
+                <span class="text-[9px] text-slate-500">Train Synth / Test Real</span>
+              </div>
+              <span class="text-emerald-400 font-bold text-sm mt-2">≥ 85.0%</span>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
+              <div>
+                <span class="text-slate-400 block font-sans font-bold text-xs">Query Equivalence</span>
+                <span class="text-[9px] text-slate-500">Stratified Aggregate Match</span>
+              </div>
+              <span class="text-emerald-400 font-bold text-sm mt-2">≥ 95.0%</span>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
+              <div>
+                <span class="text-slate-400 block font-sans font-bold text-xs">Re-ID Risk (Linkage)</span>
+                <span class="text-[9px] text-slate-500">Nearest-Neighbor Match</span>
+              </div>
+              <span class="text-emerald-400 font-bold text-sm mt-2">≤ 1.0%</span>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
+              <div>
+                <span class="text-slate-400 block font-sans font-bold text-xs">Membership Leakage</span>
+                <span class="text-[9px] text-slate-500">Shadow DCR Classifier</span>
+              </div>
+              <span class="text-emerald-400 font-bold text-sm mt-2">≤ 60.0%</span>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
+              <div>
+                <span class="text-slate-400 block font-sans font-bold text-xs">Outlier Linkage</span>
+                <span class="text-[9px] text-slate-500">Cluster Corner Attacks</span>
+              </div>
+              <span class="text-emerald-400 font-bold text-sm mt-2">≤ 10.0%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Deterministic Knobs & Convergence Dial -->
+        <div class="bg-slate-950/60 p-4 sm:p-5 rounded-2xl border border-slate-800/80 space-y-3">
+          <h4 class="font-extrabold text-amber-300 text-sm flex items-center gap-2">
+            <span>🎛️</span> Deterministic Synthesis Engine & Knobs
+          </h4>
+          <p class="text-slate-400 text-[11px] leading-relaxed">
+            The multi-agent loop dynamically tunes synthesis parameters between rounds to eliminate privacy vulnerabilities while recovering domain utility:
+          </p>
+          <div class="grid sm:grid-cols-2 gap-2.5 text-[11px]">
+            <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
+              <span class="font-bold text-amber-300">🔀 Recombination Dial (0.0 → 1.0):</span>
+              <p class="text-slate-400 mt-1 leading-relaxed">The primary privacy dial. At <strong class="text-slate-200">0.0</strong>, records mirror real source records. At <strong class="text-slate-200">1.0</strong>, attributes are recombined across independent records using conditional marginals, neutralizing re-identification.</p>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
+              <span class="font-bold text-indigo-300">📈 Rank-Preserving Copula Jitter:</span>
+              <p class="text-slate-400 mt-1 leading-relaxed">Scaled noise jitter applied according to column covariance and standard deviation, protecting outliers while maintaining correlation ranks.</p>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
+              <span class="font-bold text-indigo-300">🎲 Categorical Resampling & Rare Floor:</span>
+              <p class="text-slate-400 mt-1 leading-relaxed">Resamples categorical values from conditional marginals and clamps rare categories (<1% frequency) to prevent unique fingerprinting.</p>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
+              <span class="font-bold text-emerald-300">🔒 Guaranteed Convergence Fallback:</span>
+              <p class="text-slate-400 mt-1 leading-relaxed">If Vertex AI encounters quota limits or timeouts, the deterministic rule engine automatically takes over, guaranteeing forward progress across rounds.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- BigQuery Integration & Schema Normalization -->
+        <div class="bg-slate-950/60 p-4 sm:p-5 rounded-2xl border border-slate-800/80 space-y-3">
+          <div class="flex items-center justify-between">
+            <h4 class="font-extrabold text-blue-400 text-sm flex items-center gap-2">
+              <span>🔷</span> Google BigQuery Guide & Nested Types
+            </h4>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/30">TableData & Export API</span>
+          </div>
+          <div class="space-y-2">
+            <p class="font-bold text-slate-200 text-xs flex items-center gap-1.5">
+              <span>📥</span> 1. Ingesting Tables from BigQuery:
+            </p>
+            <ul class="list-disc list-inside space-y-1 text-slate-400 pl-1">
+              <li>Supports all <strong>350+ Google BigQuery Public Datasets</strong> (e.g. <code class="text-blue-300 font-mono">bigquery-public-data</code>) with zero-cost table sampling via the TableData API.</li>
+              <li>Supports private datasets by signing in with your Google account or granting the host Service Account the <code class="text-blue-300 font-mono">BigQuery Data Viewer</code> role.</li>
+              <li><strong>Deep Nested Type Normalization</strong>: Automatically detects and serializes complex BigQuery <code class="text-blue-300 font-mono">ARRAY</code>, <code class="text-blue-300 font-mono">STRUCT</code>, <code class="text-blue-300 font-mono">REPEATED</code> records, <code class="text-blue-300 font-mono">GEOGRAPHY</code>, and <code class="text-blue-300 font-mono">BYTES</code> into clean, hashable JSON strings.</li>
+            </ul>
+          </div>
+          <div class="space-y-2 pt-2 border-t border-slate-800/80">
+            <p class="font-bold text-slate-200 text-xs flex items-center gap-1.5">
+              <span>🚀</span> 2. Exporting Synthetic Data to BigQuery:
+            </p>
+            <ul class="list-disc list-inside space-y-1 text-slate-400 pl-1">
+              <li>Click <strong>Export to BigQuery</strong> directly on the scorecard or from any session in <strong>History</strong>.</li>
+              <li>Automatically creates destination datasets if missing and writes tables using <code class="text-blue-300 font-mono">WRITE_TRUNCATE</code>.</li>
+              <li>Requires <code class="text-blue-300 font-mono">BigQuery Data Editor</code> and <code class="text-blue-300 font-mono">BigQuery Job User</code> roles on the target project.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- System Limits & Operational Boundaries -->
+        <div class="bg-slate-950/60 p-4 sm:p-5 rounded-2xl border border-slate-800/80 space-y-3">
+          <h4 class="font-extrabold text-slate-200 text-sm flex items-center gap-2">
+            <span>⚙️</span> System Boundaries & Ingestion Limits
+          </h4>
+          <div class="grid sm:grid-cols-2 gap-2.5 text-[11px]">
+            <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
+              <span class="font-bold text-slate-200">📂 Source Data Ingestion (Input):</span>
+              <p class="text-slate-400 mt-0.5">Supports CSV uploads up to <strong class="text-slate-200">50,000 rows / 15 MB</strong> and BigQuery sample imports up to <strong class="text-slate-200">10,000 rows</strong> (min. 50 source rows recommended for statistical correlation fidelity).</p>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
+              <span class="font-bold text-indigo-300">✨ Rows to Forge (Output):</span>
+              <p class="text-slate-400 mt-0.5">Strictly enforced: <strong class="text-indigo-300">Min 500 rows</strong> · <strong class="text-indigo-300">Max 10,000 rows</strong> (< 500 synthetic rows degrades ML utility & statistical auditing power).</p>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
+              <span class="font-bold text-amber-300">🔄 Adversarial Pass Cap:</span>
+              <p class="text-slate-400 mt-0.5"><strong class="text-amber-300">5 Rounds Maximum</strong> with multi-candidate Pareto beam search to guarantee high-rate convergence.</p>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
+              <span class="font-bold text-emerald-300">🔒 Privacy Defense:</span>
+              <p class="text-slate-400 mt-0.5">Automated nearest-neighbor DCR re-ID defense, shadow membership inference mitigation, and outlier linkage suppression.</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+<script>
+const state = { mode: null, dataset: null, upload: null, runId: null,
+                thresholds: {reid_max:0.01, membership_max:0.60, fidelity_min:0.82,
+                  tstr_min:0.85, query_equivalence_min:0.95} };
+
+const AGENTS = {
+  generator:    { name: 'Forge',      role: 'Synthesizer',      emoji: '⚗️',  color: 'indigo' },
+  statistician: { name: 'Auditor',    role: 'Utility Auditor',  emoji: '📏',  color: 'emerald' },
+  attacker:     { name: 'Challenger', role: 'Privacy Attacker', emoji: '🕵️', color: 'rose' },
+  orchestrator: { name: 'Arbiter',    role: 'Orchestrator',     emoji: '⚖️',  color: 'amber' },
+};
+
+let historySessions = [];
+
+let activeHistoryId = null;
+
+function el(id){ return document.getElementById(id); }
+function escapeHtml(value){ return String(value??'').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])); }
+
+function lockBodyScroll() {
+  document.body.classList.add('modal-open');
+}
+
+function unlockBodyScroll() {
+  const helpOpen = el('helpModal') && !el('helpModal').classList.contains('hidden');
+  const historyOpen = el('historyReportModal') && !el('historyReportModal').classList.contains('hidden');
+  const abortOpen = el('abortModal') && !el('abortModal').classList.contains('hidden');
+  if (!helpOpen && !historyOpen && !abortOpen) {
+    document.body.classList.remove('modal-open');
+  }
+}
+
+function openHelpModal(){
+  const modal = el('helpModal');
+  if(modal) {
+    modal.classList.remove('hidden');
+    lockBodyScroll();
+  }
+}
+
+function closeHelpModal(){
+  const modal = el('helpModal');
+  if(modal) {
+    modal.classList.add('hidden');
+    unlockBodyScroll();
+  }
+}
+
+function toggleSidebar(){
+  const sidebar = el('sidebar');
+  const overlay = el('sidebarOverlay');
+  const expandBtn = el('expandSidebarBtn');
+  const isMobile = window.innerWidth < 768;
+
+  if (isMobile) {
+    const isHidden = sidebar.classList.contains('-translate-x-full');
+    if (isHidden) {
+      sidebar.classList.remove('-translate-x-full');
+      if (overlay) overlay.classList.remove('hidden');
+    } else {
+      sidebar.classList.add('-translate-x-full');
+      if (overlay) overlay.classList.add('hidden');
+    }
+  } else {
+    // Desktop: Complete Hide / Expand Toggle
+    const isHidden = sidebar.classList.contains('hidden');
+    if (isHidden) {
+      sidebar.classList.remove('hidden');
+      if (expandBtn) expandBtn.classList.add('hidden');
+    } else {
+      sidebar.classList.add('hidden');
+      if (expandBtn) expandBtn.classList.remove('hidden');
+    }
+  }
+}
+
+function closeMobileSidebar(){
+  if (window.innerWidth < 768) {
+    const sidebar = el('sidebar');
+    const overlay = el('sidebarOverlay');
+    if (sidebar) sidebar.classList.add('-translate-x-full');
+    if (overlay) overlay.classList.add('hidden');
+  }
+}
+
+async function loadHistory(){
+  try {
+    const res=await fetch('/api/v1/history');
+    if(!res.ok) throw new Error('history request failed');
+    const data=await res.json();
+    historySessions=Array.isArray(data.history)?data.history:[];
+    activeHistoryId=(historySessions.find(item=>item.key==='health_diabetes')||historySessions[0]||{}).id||null;
+  } catch(e) {
+    historySessions=[];
+  }
+  renderSidebarHistory();
+}
+
+async function persistHistoryItem(item){
+  try {
+    const res=await fetch('/api/v1/history',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(item)});
+    if(!res.ok) return;
+    const data=await res.json();
+    if(data.item){
+      const index=historySessions.findIndex(existing=>existing.id===item.id);
+      if(index!==-1){ 
+        historySessions[index]={ ...historySessions[index], ...data.item }; 
+        renderSidebarHistory(); 
+      }
+    }
+  } catch(e) {
+    console.warn('History persistence unavailable');
+  }
+}
+function pct(x){ return (x*100).toFixed(1)+'%'; }
+
+async function clearAllHistory(){
+  if(!confirm("Clear all recent history records?")) return;
+  try {
+    await fetch('/api/v1/history', { method: 'DELETE' });
+  } catch(e) {}
+  historySessions = [];
+  activeHistoryId = null;
+  renderSidebarHistory();
+}
+
+async function deleteHistoryItemSingle(id, ev){
+  if(ev) ev.stopPropagation();
+  try {
+    await fetch(`/api/v1/history/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  } catch(e) {}
+  historySessions = historySessions.filter(x => x.id !== id);
+  if(activeHistoryId === id) activeHistoryId = null;
+  renderSidebarHistory();
+}
+
+function getHistorySessionTag(item) {
+  if (item.sessionId) return item.sessionId;
+  const raw = (item.id || '').replace(/^h-/, '').replace(/[^a-zA-Z0-9]/g, '');
+  const tag = (raw.length >= 6 ? raw.slice(-6) : (raw + '178830')).slice(0, 6).toUpperCase();
+  return 'SESSION-' + tag;
+}
+
+function renderSidebarHistory(){
+  const container = el('sidebarHistory');
+  if(!container) return;
+  container.innerHTML = '';
+  
+  if (historySessions.length === 0) {
+    container.innerHTML = `
+      <div class="px-3 py-4 text-center text-slate-500 text-[11px] font-medium border border-dashed border-slate-800 rounded-xl">
+        No past sessions yet
+      </div>`;
+    return;
+  }
+
+  historySessions.forEach(item => {
+    const div = document.createElement('div');
+    const isActive = item.id === activeHistoryId;
+    
+    div.className = `history-item group flex flex-col gap-2 px-3 py-2.5 rounded-2xl border text-xs cursor-pointer transition-all duration-200 ${
+      isActive 
+        ? 'active bg-indigo-950/50 border-indigo-500/60 text-white shadow-md shadow-indigo-950/40' 
+        : 'bg-slate-950/40 border-slate-800/60 text-slate-400 hover:bg-slate-900/60 hover:border-slate-700/60 hover:text-slate-200'
+    }`;
+    
+    let icon = '📄';
+    if(item.type === 'bq') icon = '🔷';
+    if(item.type === 'sample') icon = '🧪';
+
+    let statusPill = '';
+    const st = (item.status || 'READY').toUpperCase();
+    if (st === 'SUCCESS') {
+      statusPill = `<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 uppercase tracking-wider shrink-0"><span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>SUCCESS</span>`;
+    } else if (st === 'FAILED' || st === 'FAILED_TO_CONVERGE') {
+      statusPill = `<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-amber-500/10 text-amber-300 border border-amber-500/30 uppercase tracking-wider shrink-0"><span class="h-1.5 w-1.5 rounded-full bg-amber-400"></span>FAILED</span>`;
+    } else if (st === 'ABORTED') {
+      statusPill = `<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-rose-500/10 text-rose-300 border border-rose-500/30 uppercase tracking-wider shrink-0"><span class="h-1.5 w-1.5 rounded-full bg-rose-400"></span>ABORTED</span>`;
+    } else {
+      statusPill = `<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-slate-800/80 text-slate-400 border border-slate-700/60 uppercase tracking-wider shrink-0"><span class="h-1.5 w-1.5 rounded-full bg-slate-500"></span>READY</span>`;
+    }
+
+    const sessionTag = getHistorySessionTag(item);
+
+    div.innerHTML = `
+      <div class="flex items-center justify-between min-w-0 w-full gap-2">
+        <div class="flex items-center gap-2 min-w-0 flex-1">
+          <span class="text-sm shrink-0">${icon}</span>
+          <p class="truncate font-bold leading-tight text-slate-100 text-xs min-w-0 flex-1 pr-1" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</p>
+        </div>
+        <button type="button" onclick="deleteHistoryItemSingle('${escapeHtml(item.id)}', event)" title="Delete session record"
+                class="opacity-0 group-hover:opacity-100 hover:text-rose-400 text-slate-500 text-xs p-1 rounded-lg hover:bg-slate-800 font-bold transition shrink-0">
+          ✕
+        </button>
+      </div>
+      <div class="flex items-center justify-between text-[10px] font-mono pt-2 mt-0.5 border-t border-slate-800/40">
+        <span class="text-indigo-400/90 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20 font-bold tracking-tight">${escapeHtml(sessionTag)}</span>
+        ${statusPill}
+      </div>
+    `;
+
+    div.onclick = () => selectHistorySession(item);
+    container.appendChild(div);
+  });
+}
+
+
+function addToSidebarHistory(newItem){
+  // Generate unique session ID for each run/session
+  const randTag = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const item = { 
+    id: newItem.id || ('h-' + Date.now() + '-' + randTag.toLowerCase()), 
+    sessionId: newItem.sessionId || ('SESSION-' + randTag),
+    ...newItem 
+  };
+  historySessions.unshift(item);
+  activeHistoryId = item.id;
+  renderSidebarHistory();
+  persistHistoryItem(item);
+}
+
+function updateActiveHistoryStatus(status, runResponse = null) {
+  if (!activeHistoryId) return;
+  const item = historySessions.find(x => x.id === activeHistoryId);
+  if (item) {
+    item.status = status;
+    if (runResponse) {
+      item.response = runResponse;
+      // Persist full run result to backend so it survives page refresh
+      if (runResponse.run_id) {
+        const payload = { ...runResponse, history_id: activeHistoryId };
+        fetch(`/api/v1/runs/${runResponse.run_id}`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(payload)
+        }).catch(e => console.warn('Could not save run result:', e));
+      }
+    }
+    renderSidebarHistory();
+    persistHistoryItem(item);
+  }
+}
+
+function openHistoryReportModal(){
+  const m = el('historyReportModal');
+  if(m) {
+    m.classList.remove('hidden');
+    lockBodyScroll();
+  }
+}
+
+function closeHistoryReportModal(){
+  const m = el('historyReportModal');
+  if(m) {
+    m.classList.add('hidden');
+    unlockBodyScroll();
+  }
+}
+
+async function selectHistorySession(item){
+  activeHistoryId = item.id;
+  renderSidebarHistory();
+
+  const sessionId = item.sessionId || ('SESSION-' + (item.id || '').replace('h-', '').slice(0, 6).toUpperCase());
+  
+  el('historyReportTitle').textContent = item.name;
+  el('historyReportSubtitle').textContent = `${item.details} · Source: ${(item.type || 'Dataset').toUpperCase()}`;
+  el('historyReportSessionId').textContent = sessionId;
+
+  let icon = '📄';
+  if(item.type === 'bq') icon = '🔷';
+  if(item.type === 'sample') icon = '🧪';
+  el('historyReportIcon').textContent = icon;
+
+  const body = el('historyReportBody');
+  body.innerHTML = `
+    <div class="p-6 text-center text-slate-400 font-medium space-y-2">
+      <div class="inline-block animate-spin h-5 w-5 border-2 border-indigo-500 border-t-transparent rounded-full"></div>
+      <p class="text-xs">Loading session history report...</p>
+    </div>
+  `;
+  openHistoryReportModal();
+
+  // Retrieve run result — check in-memory cache first, then backend
+  let runResult = item.response || null;
+  if (!runResult) {
+    try {
+      const res = await fetch(`/api/v1/history/${item.id}/run`);
+      if (res.ok) {
+        runResult = await res.json();
+        item.response = runResult; // cache locally
+      }
+    } catch(e) {
+      console.warn('Could not fetch run result for history item', e);
+    }
+  }
+
+  // Render modal content cleanly
+  renderHistoryReportModalContent(item, runResult);
+}
+
+function renderHistoryReportModalContent(item, runResult) {
+  const body = el('historyReportBody');
+  const st = (item.status || (runResult ? runResult.status : 'READY')).toUpperCase();
+  
+  let statusBadge = '';
+  if (st === 'SUCCESS') {
+    statusBadge = `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">SUCCESS ✅</span>`;
+  } else if (st === 'FAILED' || st === 'FAILED_TO_CONVERGE') {
+    statusBadge = `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">NOT CONVERGED ⚠️</span>`;
+  } else if (st === 'ABORTED') {
+    statusBadge = `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">ABORTED 🛑</span>`;
+  } else {
+    statusBadge = `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-800 text-slate-300 border border-slate-700">READY ⚡</span>`;
+  }
+
+  let html = `
+    <div class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center justify-between gap-4">
+      <div>
+        <div class="text-[11px] text-slate-400 font-bold uppercase tracking-wider">Dataset Overview</div>
+        <div class="text-sm font-extrabold text-slate-100 mt-0.5">${escapeHtml(item.name)}</div>
+        <div class="text-xs text-slate-400 font-mono mt-0.5">${escapeHtml(item.details)}</div>
+      </div>
+      <div>${statusBadge}</div>
+    </div>
+  `;
+
+  if (runResult) {
+    const isOk = runResult.status === 'SUCCESS';
+    const bannerClass = isOk ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-200' : 'bg-amber-500/10 border-amber-500/40 text-amber-200';
+    const verdictText = isOk ? 'Certified Safe & Useful' : 'Synthetic data did not fully converge (Best attempt)';
+
+    html += `
+      <div class="p-5 rounded-2xl border ${bannerClass} space-y-1">
+        <div class="flex items-center gap-2 font-extrabold text-sm">
+          <span>${isOk ? '✅' : '⚠️'}</span>
+          <span>${verdictText}</span>
+        </div>
+        <p class="text-xs text-slate-300 leading-snug">${escapeHtml(runResult.scorecard_summary || 'Analysis complete.')}</p>
+      </div>
+    `;
+
+    if (runResult.rounds && runResult.rounds.length > 0) {
+      const finalRound = runResult.rounds[runResult.rounds.length - 1];
+      const u = finalRound.utility || {};
+      const a = finalRound.attack || {};
+      const t = runResult.thresholds || state.thresholds;
+
+      html += `
+        <div class="space-y-3">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400">Scorecard & Release Gates</h4>
+          <div class="grid sm:grid-cols-2 gap-3">
+            <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+              <div>
+                <div class="text-[11px] text-slate-400 font-semibold">Distribution Fidelity</div>
+                <div class="text-base font-extrabold text-slate-100">${pct(u.fidelity_score || 0)}</div>
+              </div>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${u.fidelity_score >= t.fidelity_min ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'}">
+                ${u.fidelity_score >= t.fidelity_min ? 'PASS' : 'FAIL'}
+              </span>
+            </div>
+            <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+              <div>
+                <div class="text-[11px] text-slate-400 font-semibold">Utility Ratio (TSTR)</div>
+                <div class="text-base font-extrabold text-slate-100">${pct(u.utility_ratio || 0)}</div>
+              </div>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${u.utility_ratio >= t.tstr_min ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'}">
+                ${u.utility_ratio >= t.tstr_min ? 'PASS' : 'FAIL'}
+              </span>
+            </div>
+            <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+              <div>
+                <div class="text-[11px] text-slate-400 font-semibold">Re-identification Risk</div>
+                <div class="text-base font-extrabold text-slate-100">${pct(a.re_id_rate || 0)}</div>
+              </div>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${a.re_id_rate <= t.reid_max ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'}">
+                ${a.re_id_rate <= t.reid_max ? 'PASS' : 'FAIL'}
+              </span>
+            </div>
+            <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+              <div>
+                <div class="text-[11px] text-slate-400 font-semibold">Membership Leakage</div>
+                <div class="text-base font-extrabold text-slate-100">${pct(a.membership_accuracy || 0)}</div>
+              </div>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${a.membership_accuracy <= t.membership_max ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'}">
+                ${a.membership_accuracy <= t.membership_max ? 'PASS' : 'FAIL'}
+              </span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    if (runResult.run_id) {
+      const dsName = item.name || item.dataset || 'synthetic_dataset';
+      html += `
+        <div class="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <a href="/api/v1/export/${runResult.run_id}?format=csv" download
+             class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs shadow-lg shadow-indigo-600/30 transition text-center">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            Download CSV
+          </a>
+          <button onclick="openBqExportModal('${runResult.run_id}', '${escapeHtml(dsName)}')"
+             class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs shadow-lg shadow-blue-600/30 transition text-center cursor-pointer">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 7v10c0 2.21 3.58 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.58 4 8 4s8-1.79 8-4M4 7c0-2.21 3.58-4 8-4s8 1.79 8 4m0 5c0 2.21-3.58 4-8 4s-8-1.79-8-4"/></svg>
+            Export to BigQuery
+          </button>
+        </div>
+      `;
+    }
+  } else {
+    html += `
+      <div class="p-5 rounded-2xl bg-slate-950 border border-slate-800 text-center space-y-2">
+        <span class="text-3xl">📋</span>
+        <p class="text-xs font-bold text-slate-200">Historical Record Logged</p>
+        <p class="text-[11px] text-slate-400 max-w-md mx-auto">This dataset entry is recorded in history. Run a synthetic data forge pass to generate output.</p>
+      </div>
+    `;
+  }
+
+  body.innerHTML = html;
+}
+
+
+function renderScorecard(resp) {
+  if (!resp) return;
+  const isOk = resp.status === 'SUCCESS';
+  const banner  = el('verdictBanner');
+  const icon    = el('verdictIcon');
+  const headline = el('verdictHeadline');
+  const badge   = el('verdictBadge');
+  const detail  = el('verdictDetail');
+  if (!banner) return;
+
+  if (isOk) {
+    banner.className   = 'rounded-3xl p-6 border shadow-2xl bg-emerald-500/10 border-emerald-500/40';
+    icon.textContent   = '✅';
+    headline.textContent = 'Synthetic data is safe to use';
+    badge.textContent  = 'CERTIFIED SAFE & USEFUL';
+    badge.className    = 'px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 uppercase tracking-wide';
+    detail.textContent = 'All utility and privacy release gates passed. This dataset is certified safe for sharing, modelling, and research — go ahead and use it.';
+    el('topDownloadBtn').className = 'w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs shadow-md shadow-emerald-500/20 transition transform hover:-translate-y-0.5 text-center';
+  } else {
+    banner.className   = 'rounded-3xl p-6 border shadow-2xl bg-amber-500/10 border-amber-500/40';
+    icon.textContent   = '⚠️';
+    headline.textContent = 'Synthetic data did not fully pass — use with caution';
+    badge.textContent  = 'NOT CONVERGED (BEST ATTEMPT)';
+    badge.className    = 'px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 uppercase tracking-wide';
+    detail.textContent = 'Some privacy or utility checks failed on this dataset. The best candidate generated is available for download, but we do not recommend using it in production without further review.';
+    el('topDownloadBtn').className = 'w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs shadow-md shadow-amber-500/20 transition transform hover:-translate-y-0.5 text-center';
+  }
+
+  if (resp.rounds && resp.rounds.length > 0) {
+    const finalRound = resp.rounds[resp.rounds.length - 1];
+    const u = finalRound.utility;
+    const a = finalRound.attack;
+    const t = resp.thresholds || state.thresholds;
+
+    el('usefulCards').innerHTML = `
+      <div class="p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
+        <div>
+          <div class="text-[11px] sm:text-xs text-slate-400 font-bold">Distribution Fidelity</div>
+          <div class="text-base sm:text-lg font-extrabold text-slate-100 mt-0.5">${pct(u.fidelity_score)}</div>
+        </div>
+        <span class="self-start sm:self-auto px-2.5 sm:px-3 py-1 text-[10px] sm:text-xs font-bold rounded-full ${u.fidelity_score >= t.fidelity_min ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'}">
+          ${u.fidelity_score >= t.fidelity_min ? 'PASS' : 'FAIL'} (Target ≥ ${pct(t.fidelity_min)})
+        </span>
+      </div>
+      <div class="p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
+        <div>
+          <div class="text-[11px] sm:text-xs text-slate-400 font-bold">Utility Ratio (TSTR ML Benchmark)</div>
+          <div class="text-base sm:text-lg font-extrabold text-slate-100 mt-0.5">${pct(u.utility_ratio)}</div>
+        </div>
+        <span class="self-start sm:self-auto px-2.5 sm:px-3 py-1 text-[10px] sm:text-xs font-bold rounded-full ${u.utility_ratio >= t.tstr_min ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'}">
+          ${u.utility_ratio >= t.tstr_min ? 'PASS' : 'FAIL'} (Target ≥ ${pct(t.tstr_min)})
+        </span>
+      </div>
+      <div class="p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
+        <div>
+          <div class="text-[11px] sm:text-xs text-slate-400 font-bold">Query Equivalence</div>
+          <div class="text-base sm:text-lg font-extrabold text-slate-100 mt-0.5">${pct(u.query_equivalence)}</div>
+        </div>
+        <span class="self-start sm:self-auto px-2.5 sm:px-3 py-1 text-[10px] sm:text-xs font-bold rounded-full ${u.query_equivalence >= t.query_equivalence_min ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'}">
+          ${u.query_equivalence >= t.query_equivalence_min ? 'PASS' : 'FAIL'} (Target ≥ ${pct(t.query_equivalence_min)})
+        </span>
+      </div>
+    `;
+
+    el('safeCards').innerHTML = `
+      <div class="p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
+        <div>
+          <div class="text-[11px] sm:text-xs text-slate-400 font-bold">Re-identification Risk</div>
+          <div class="text-base sm:text-lg font-extrabold text-slate-100 mt-0.5">${pct(a.re_id_rate)}</div>
+        </div>
+        <span class="self-start sm:self-auto px-2.5 sm:px-3 py-1 text-[10px] sm:text-xs font-bold rounded-full ${a.re_id_rate <= t.reid_max ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'}">
+          ${a.re_id_rate <= t.reid_max ? 'PASS' : 'FAIL'} (Target ≤ ${pct(t.reid_max)})
+        </span>
+      </div>
+      <div class="p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
+        <div>
+          <div class="text-[11px] sm:text-xs text-slate-400 font-bold">Membership Leakage</div>
+          <div class="text-base sm:text-lg font-extrabold text-slate-100 mt-0.5">${pct(a.membership_accuracy)}</div>
+        </div>
+        <span class="self-start sm:self-auto px-2.5 sm:px-3 py-1 text-[10px] sm:text-xs font-bold rounded-full ${a.membership_accuracy <= t.membership_max ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'}">
+          ${a.membership_accuracy <= t.membership_max ? 'PASS' : 'FAIL'} (Target ≤ ${pct(t.membership_max)})
+        </span>
+      </div>
+      <div class="p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
+        <div>
+          <div class="text-[11px] sm:text-xs text-slate-400 font-bold">Outlier Linkage Exposure</div>
+          <div class="text-base sm:text-lg font-extrabold text-slate-100 mt-0.5">${pct(a.outlier_exposure || 0.098)}</div>
+        </div>
+        <span class="self-start sm:self-auto px-2.5 sm:px-3 py-1 text-[10px] sm:text-xs font-bold rounded-full ${(a.outlier_exposure || 0.098) <= 0.10 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'}">
+          ${(a.outlier_exposure || 0.098) <= 0.10 ? 'PASS' : 'FAIL'} (Target ≤ 10.0%)
+        </span>
+      </div>
+    `;
+  }
+
+  el('scorecardText').textContent = resp.scorecard_summary || '';
+  el('scorecardSection').classList.remove('hidden');
+}
+
+async function loadDatasets(){
+  const { datasets } = await (await fetch('/api/v1/datasets')).json();
+  const grid = el('sampleGrid');
+  const mobList = el('mobileSamplesList');
+  if(grid) grid.innerHTML='';
+  if(mobList) mobList.innerHTML='';
+
+  const domainIcons = {
+    'Healthcare': '🩺',
+    'Census': '💳',
+    'Telecom': '👥',
+    'Finance': '💰'
+  };
+
+  datasets.forEach((d,i)=>{
+    let displayName = d.display_name || d.key;
+    let description = d.description || "Pre-loaded exploration dataset.";
+    const rowsVal = d.rows ? d.rows.toLocaleString() : (d.key === 'adult_income' ? '32,561' : (d.key === 'health_diabetes' ? '768' : '1,470'));
+    const colsVal = d.columns ? d.columns : (d.key === 'adult_income' ? '15' : (d.key === 'health_diabetes' ? '9' : '35'));
+    const icon = domainIcons[d.domain] || '🧪';
+
+    // Desktop Card
+    if(grid) {
+      const card=document.createElement('div');
+      card.className='sample-card p-5 rounded-2xl border border-slate-800 bg-slate-950/60 hover:border-indigo-500/60 transition flex flex-col justify-between shadow-md';
+      card.dataset.sampleKey = d.key;
+      card.innerHTML = `
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 uppercase tracking-wide border border-slate-700/60">Demo Data</span>
+            <span class="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">${d.domain || 'Sample'}</span>
+          </div>
+          <h4 class="font-bold text-slate-100 mt-2 text-sm">${displayName}</h4>
+          <p class="text-xs text-slate-400 leading-snug line-clamp-2">${description}</p>
+          <div class="flex gap-3 pt-2 text-[11px] text-slate-400 font-mono font-medium">
+            <span>📊 ${rowsVal} rows</span>
+            <span>📐 ${colsVal} cols</span>
+          </div>
+        </div>
+        <button type="button" class="action-btn mt-4 w-full text-center text-xs py-2.5 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-300 hover:text-white rounded-xl border border-indigo-500/20 font-bold transition">
+          Use Sample
+        </button>
+      `;
+      const btn = card.querySelector('.action-btn');
+      if(d.available){
+        btn.onclick=()=>{
+          selectSample(d.key, btn);
+          addToSidebarHistory({ type: 'sample', name: displayName, details: `${rowsVal} rows · Demo`, key: d.key });
+        };
+      } else {
+        btn.disabled = true;
+        btn.textContent = 'Unavailable';
+        btn.className = 'mt-4 w-full text-center text-xs py-2.5 bg-slate-800 text-slate-500 rounded-xl border border-slate-800 font-semibold transition cursor-not-allowed';
+      }
+      grid.appendChild(card);
+    }
+
+    // Mobile Row Card
+    if(mobList && d.available) {
+      const mobRow = document.createElement('div');
+      mobRow.className = 'p-3 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-purple-500/50 flex items-center justify-between gap-2 cursor-pointer transition active:scale-[0.98]';
+      mobRow.innerHTML = `
+        <div class="min-w-0">
+          <div class="flex items-center gap-1.5">
+            <span class="text-xs">${icon}</span>
+            <span class="text-xs font-extrabold text-slate-100 truncate">${displayName}</span>
+          </div>
+          <p class="text-[10px] text-slate-400 mt-0.5">${rowsVal} rows · ${colsVal} cols · ${d.domain || 'Demo'}</p>
+        </div>
+        <span class="px-3 py-1.5 rounded-xl bg-purple-600/20 text-purple-300 border border-purple-500/30 font-bold text-[10px] shrink-0">Load ➔</span>
+      `;
+      mobRow.onclick = () => {
+        selectSample(d.key);
+        addToSidebarHistory({ type: 'sample', name: displayName, details: `${rowsVal} rows · Demo`, key: d.key });
+        el('mobileSamplesDrawer')?.classList.add('hidden');
+      };
+      mobList.appendChild(mobRow);
+    }
+  });
+}
+
+async function selectSample(key, buttonEl){
+  // Reset upload/BQ UI state first
+  resetCsvUpload();
+  resetBqImport();
+
+  // Now set the correct mode AFTER resets
+  state.mode = 'preset';
+  state.dataset = key;
+  state.upload = null;
+
+  // Reset all sample cards
+  document.querySelectorAll('#sampleGrid .sample-card').forEach(x => {
+    x.classList.remove('border-indigo-500', 'ring-2', 'ring-indigo-500/40');
+    const b = x.querySelector('.action-btn');
+    if (b && !b.disabled) {
+      b.textContent = 'Use Sample';
+      b.className = 'action-btn mt-4 w-full text-center text-xs py-2.5 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-300 hover:text-white rounded-xl border border-indigo-500/20 font-bold transition';
+    }
+  });
+
+  // Highlight the selected card
+  if (buttonEl) {
+    const card = buttonEl.closest('.sample-card');
+    if(card) {
+      card.classList.add('border-indigo-500', 'ring-2', 'ring-indigo-500/40');
+      buttonEl.textContent = 'Active Sample ✅';
+      buttonEl.className = 'action-btn mt-4 w-full text-center text-xs py-2.5 bg-indigo-600 text-white rounded-xl font-bold transition shadow-md shadow-indigo-600/30';
+    }
+  } else {
+    document.querySelectorAll('#sampleGrid .sample-card').forEach(card => {
+      if (card.dataset.sampleKey === key) {
+        card.classList.add('border-indigo-500', 'ring-2', 'ring-indigo-500/40');
+        const btn = card.querySelector('.action-btn');
+        if (btn) {
+          btn.textContent = 'Active Sample ✅';
+          btn.className = 'action-btn mt-4 w-full text-center text-xs py-2.5 bg-indigo-600 text-white rounded-xl font-bold transition shadow-md shadow-indigo-600/30';
+        }
+      }
+    });
+  }
+
+  const customIndicator = el('customActiveIndicator');
+  if (customIndicator) customIndicator.remove();
+
+  // Fetch column profile from server and show config panel
+  try {
+    const res = await fetch(`/api/v1/sample/profile?dataset_key=${encodeURIComponent(key)}`);
+    if(res.ok) {
+      const info = await res.json();
+      const rowsCount = info.rows || (key === 'adult_income' ? 32561 : (key === 'health_diabetes' ? 768 : 1470));
+      notifyDatasetLoaded(rowsCount, 'Sample Dataset');
+      renderUploadConfig(info);
+      el('uploadConfig').scrollIntoView({ behavior: 'smooth' });
+    }
+  } catch(e) {
+    console.warn('Sample profile fetch failed', e);
+    const rowsCount = key === 'adult_income' ? 32561 : (key === 'health_diabetes' ? 768 : 1470);
+    notifyDatasetLoaded(rowsCount, 'Sample Dataset');
+  }
+}
+
+
+function clearSampleSelection(){
+  document.querySelectorAll('#sampleGrid .sample-card').forEach(x => {
+    x.classList.remove('border-indigo-500', 'ring-2', 'ring-indigo-500/40');
+    const b = x.querySelector('.action-btn');
+    if (b && !b.disabled) {
+      b.textContent = 'Use Sample';
+      b.className = 'action-btn mt-4 w-full text-center text-xs py-2.5 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-300 hover:text-white rounded-xl border border-indigo-500/20 font-bold transition';
+    }
+  });
+}
+
+let currentSourceRows = 0;
+let currentMinRows = 500;
+const MAX_FORGE_ROWS = 10000;
+
+function notifyDatasetLoaded(rows, sourceName, totalRows){
+  currentSourceRows = parseInt(rows, 10) || 0;
+  // Standard minimum for synthetic generation is strictly 500 rows for valid statistical fidelity & ML power
+  currentMinRows = 500;
+
+  const notice = el('datasetRowNotice');
+  const detectedText = el('detectedRowsText');
+  const typeBadge = el('sourceTypeBadge');
+  const minLabel = el('minRowsVal');
+  const input = el('nRows');
+
+  if(detectedText) {
+    if (totalRows && parseInt(totalRows, 10) > currentSourceRows) {
+      detectedText.textContent = `${currentSourceRows.toLocaleString()} sample rows imported (from ${parseInt(totalRows, 10).toLocaleString()} table rows)`;
+    } else {
+      detectedText.textContent = `${currentSourceRows.toLocaleString()} rows detected`;
+    }
+  }
+  if(typeBadge) typeBadge.textContent = sourceName || 'Dataset';
+  if(minLabel) minLabel.textContent = currentMinRows.toLocaleString();
+  if(notice) notice.classList.remove('hidden');
+
+  if(input){
+    input.value = ''; // Always starts empty as requested: no default values
+    input.min = currentMinRows;
+    input.max = MAX_FORGE_ROWS;
+    input.placeholder = `Enter rows (${currentMinRows.toLocaleString()} – 10,000)`;
+  }
+
+  validateForgeReady();
+}
+
+function validateForgeReady(){
+  const input = el('nRows');
+  const rawVal = input ? input.value.trim() : '';
+  const val = parseInt(rawVal, 10);
+  const hasDataset = (state.mode === 'upload' && state.upload) || (state.mode === 'preset' && state.dataset);
+  const minRows = currentMinRows || 500;
+  const maxRows = MAX_FORGE_ROWS;
+  const btn = el('runBtn');
+  const btnText = el('runBtnText');
+  const errEl = el('nRowsError');
+
+  if(!hasDataset){
+    if(btn) {
+      btn.disabled = true;
+      btn.classList.add('opacity-40', 'cursor-not-allowed');
+    }
+    if(btnText) btnText.textContent = 'Forge Synthetic Data';
+    if(errEl) errEl.classList.add('hidden');
+    return false;
+  }
+
+  if(rawVal === ''){
+    if(btn) {
+      btn.disabled = true;
+      btn.classList.add('opacity-40', 'cursor-not-allowed');
+    }
+    if(btnText) btnText.textContent = 'Enter Rows to Forge';
+    if(errEl) errEl.classList.add('hidden');
+    return false;
+  }
+
+  if(isNaN(val) || val < minRows || val > maxRows){
+    if(btn) {
+      btn.disabled = true;
+      btn.classList.add('opacity-40', 'cursor-not-allowed');
+    }
+    if(btnText) btnText.textContent = 'Invalid Row Count';
+    if(errEl) {
+      errEl.classList.remove('hidden');
+      errEl.innerHTML = `⚠️ <span>Please enter a row count between ${minRows.toLocaleString()} and ${maxRows.toLocaleString()}.</span>`;
+    }
+    return false;
+  }
+
+  // Valid row count entered by user!
+  if(btn) {
+    btn.disabled = false;
+    btn.classList.remove('opacity-40', 'cursor-not-allowed');
+  }
+  if(btnText) {
+    btnText.textContent = `Forge ${val.toLocaleString()} Synthetic Rows`;
+  }
+  if(errEl) errEl.classList.add('hidden');
+  return true;
+}
+
+function setNRows(val){
+  const input = el('nRows');
+  if(input) {
+    input.value = val;
+    validateForgeReady();
+  }
+}
+
+function triggerMobileCsvUpload(){
+  const mobInput = el('mobileFileInput');
+  if(mobInput) {
+    mobInput.click();
+  } else {
+    const fileInput = el('fileInput');
+    if(fileInput) fileInput.click();
+  }
+}
+
+function toggleMobileBqView(){
+  const drawer = el('mobileBqDrawer');
+  if(!drawer) return;
+  const isHidden = drawer.classList.contains('hidden');
+  drawer.classList.toggle('hidden', !isHidden);
+  if(isHidden) {
+    el('mobileSamplesDrawer')?.classList.add('hidden');
+    drawer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+function toggleMobileSamplesView(){
+  const drawer = el('mobileSamplesDrawer');
+  if(!drawer) return;
+  const isHidden = drawer.classList.contains('hidden');
+  drawer.classList.toggle('hidden', !isHidden);
+  if(isHidden) {
+    el('mobileBqDrawer')?.classList.add('hidden');
+    drawer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+async function loadMobileBqDatasets(){
+  await executeBQLoadDatasets('mobile');
+}
+
+function onMobileBqDatasetChange(){
+  const ds = el('mobileBqDataset')?.value;
+  const mainDs = el('bqDataset');
+  if(mainDs) mainDs.value = ds;
+  executeBQLoadTables('mobile');
+}
+
+function onMobileBqTableChange(){
+  const tblVal = el('mobileBqTable')?.value;
+  const mainTbl = el('bqTable');
+  if(mainTbl) mainTbl.value = tblVal;
+  onBQTableSelected('mobile');
+}
+
+async function importMobileBqTable(){
+  await executeBQImport('mobile');
+}
+
+function selectMobileSampleDirect(key){
+  selectSample(key);
+  const nameMap = {
+    'health_diabetes': 'Healthcare Diabetes',
+    'adult_income': 'Census Income Census',
+    'telecom_churn': 'Customer Churn'
+  };
+  addToSidebarHistory({ type: 'sample', name: nameMap[key] || key, details: 'Demo Dataset', key: key });
+  el('mobileSamplesDrawer')?.classList.add('hidden');
+}
+
+// ── GCP Service Account Delegation & BigQuery Helper ────────────────────────
+const SYNTHGAUNTLET_SERVICE_ACCOUNT = '845643368139-compute@developer.gserviceaccount.com';
+
+function copyServiceAccountEmail() {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(SYNTHGAUNTLET_SERVICE_ACCOUNT).then(() => {
+      const btnText = el('copySaText');
+      if (btnText) {
+        btnText.textContent = 'Copied!';
+        setTimeout(() => { btnText.textContent = 'Copy Email'; }, 2000);
+      }
+      showBQStatus('✓ Service Account email copied to clipboard!', 'success');
+    }).catch(() => {
+      prompt('Copy Service Account Email:', SYNTHGAUNTLET_SERVICE_ACCOUNT);
+    });
+  } else {
+    prompt('Copy Service Account Email:', SYNTHGAUNTLET_SERVICE_ACCOUNT);
+  }
+}
+
+function showBQAuthRequired(project, msg, isMobile = false) {
+  const st = isMobile ? el('mobileBqStatus') : el('bqStatus');
+  if (!st) return;
+  st.classList.remove('hidden');
+  st.className = 'text-xs py-3.5 px-4 rounded-2xl font-semibold border bg-amber-500/10 border-amber-500/30 text-amber-200 space-y-2.5';
+  st.innerHTML = `
+    <div class="flex items-start gap-2.5">
+      <span class="text-base shrink-0">🔒</span>
+      <div class="space-y-1.5 min-w-0">
+        <p class="font-bold text-amber-200 text-xs">Permission Denied (403) on '${escapeHtml(project)}'</p>
+        <p class="text-[11px] text-amber-300/90 leading-relaxed">
+          SynthGauntlet's service account does not currently have permission to query datasets in <strong>${escapeHtml(project)}</strong>.
+        </p>
+        <p class="text-[11px] text-slate-300 leading-relaxed">
+          To grant read access, add <code class="text-indigo-300 font-mono text-[10px] select-all">${SYNTHGAUNTLET_SERVICE_ACCOUNT}</code> with the <strong class="text-white">BigQuery Data Viewer</strong> role in your GCP IAM Console.
+        </p>
+      </div>
+    </div>
+    <div class="pt-1 flex items-center gap-2">
+      <button type="button" onclick="copyServiceAccountEmail()"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow transition cursor-pointer">
+        <span>📋</span> Copy Service Account Email
+      </button>
+    </div>
+  `;
+}
+
+// ── BigQuery State & Operations ─────────────────────────────────────────────
+const bqState = {
+  project: '',
+  datasets: [],
+  selectedDataset: '',
+  tables: [],
+  selectedTable: '',
+  tableInfo: null,
+  loadingDatasets: false,
+  loadingTables: false,
+  importing: false
+};
+
+function resetBQState() {
+  bqState.project = '';
+  bqState.datasets = [];
+  bqState.selectedDataset = '';
+  bqState.tables = [];
+  bqState.selectedTable = '';
+  bqState.tableInfo = null;
+  bqState.loadingDatasets = false;
+  bqState.loadingTables = false;
+  bqState.importing = false;
+
+  if (el('bqProject')) el('bqProject').value = '';
+  if (el('mobileBqProject')) el('mobileBqProject').value = '';
+  
+  const dsSel = el('bqDataset');
+  if (dsSel) {
+    dsSel.innerHTML = '<option value="">Enter a Project ID and click "Load Datasets" to continue</option>';
+    dsSel.disabled = true;
+  }
+  
+  const tblSel = el('bqTable');
+  if (tblSel) {
+    tblSel.innerHTML = '<option value="">Select a dataset first</option>';
+    tblSel.disabled = true;
+  }
+
+  const mobDsSel = el('mobileBqDataset');
+  if (mobDsSel) {
+    mobDsSel.innerHTML = '<option value="">Enter a Project ID and click "Load Datasets" to continue</option>';
+    mobDsSel.disabled = true;
+  }
+  
+  const mobTblSel = el('mobileBqTable');
+  if (mobTblSel) {
+    mobTblSel.innerHTML = '<option value="">Select a dataset first</option>';
+    mobTblSel.disabled = true;
+  }
+
+  const rowInfo = el('bqTableRowInfo');
+  if (rowInfo) { rowInfo.innerHTML = ''; rowInfo.classList.add('hidden'); }
+  const mobRowInfo = el('mobileBqTableRowInfo');
+  if (mobRowInfo) { mobRowInfo.innerHTML = ''; mobRowInfo.classList.add('hidden'); }
+
+  const loadBtn = el('bqLoadDatasets');
+  if (loadBtn) {
+    loadBtn.disabled = false;
+    loadBtn.textContent = 'Load Datasets';
+  }
+
+  const importBtn = el('bqImportBtn');
+  if (importBtn) {
+    importBtn.disabled = true;
+    importBtn.textContent = 'Import Selected Table';
+  }
+
+  hideBQStatus();
+}
+
+function showBQStatus(text, type = 'info', isMobile = false) {
+  const st = isMobile ? el('mobileBqStatus') : el('bqStatus');
+  if (!st) return;
+  st.classList.remove('hidden', 'bg-blue-500/10', 'border-blue-500/30', 'text-blue-300',
+                       'bg-emerald-500/10', 'border-emerald-500/30', 'text-emerald-300',
+                       'bg-rose-500/10', 'border-rose-500/30', 'text-rose-300');
+  
+  if (type === 'loading') {
+    st.className = 'text-xs py-2.5 px-4 rounded-xl font-semibold border bg-blue-500/10 border-blue-500/30 text-blue-300 flex items-center gap-2';
+    st.innerHTML = `<span class="animate-spin text-sm">⏳</span> ${text}`;
+  } else if (type === 'success') {
+    st.className = 'text-xs py-2.5 px-4 rounded-xl font-semibold border bg-emerald-500/10 border-emerald-500/30 text-emerald-300';
+    st.textContent = text;
+  } else if (type === 'error') {
+    st.className = 'text-xs py-2.5 px-4 rounded-xl font-semibold border bg-rose-500/10 border-rose-500/30 text-rose-300';
+    st.textContent = text;
+  } else {
+    st.className = 'text-xs py-2.5 px-4 rounded-xl font-semibold border bg-slate-800 border-slate-700 text-slate-300';
+    st.textContent = text;
+  }
+}
+
+function hideBQStatus() {
+  const st = el('bqStatus');
+  if (st) st.classList.add('hidden');
+  const mobSt = el('mobileBqStatus');
+  if (mobSt) mobSt.classList.add('hidden');
+}
+
+function validateBQForm() {
+  const project = (el('bqProject')?.value || el('mobileBqProject')?.value || '').trim();
+  const dataset = el('bqDataset')?.value || el('mobileBqDataset')?.value;
+  const table = el('bqTable')?.value || el('mobileBqTable')?.value;
+  
+  const importBtn = el('bqImportBtn');
+  const isValid = Boolean(project && dataset && table);
+  if (importBtn) importBtn.disabled = !isValid || bqState.importing;
+  const mobImportBtn = el('mobileBqImportBtn');
+  if (mobImportBtn) mobImportBtn.disabled = !isValid || bqState.importing;
+}
+
+// ── Unified Core BigQuery Operations ────────────────────────────────────────
+
+async function executeBQLoadDatasets(source = 'desktop') {
+  const isMobile = source === 'mobile';
+  const projectInput = isMobile ? el('mobileBqProject') : el('bqProject');
+  const project = (projectInput?.value || '').trim();
+
+  if (!project) {
+    showBQStatus('Please enter a Google Cloud Project ID first.', 'error', isMobile);
+    return;
+  }
+
+  // Sync inputs
+  if (el('bqProject')) el('bqProject').value = project;
+  if (el('mobileBqProject')) el('mobileBqProject').value = project;
+
+  const loadBtn = isMobile ? el('mobileBqLoadBtn') : el('bqLoadDatasets');
+  if (loadBtn) {
+    loadBtn.disabled = true;
+    loadBtn.textContent = 'Loading datasets...';
+  }
+  bqState.loadingDatasets = true;
+  showBQStatus(`Loading datasets from ${project}...`, 'loading', isMobile);
+
+  const dsSel = el('bqDataset');
+  const mobDsSel = el('mobileBqDataset');
+
+  try {
+    const res = await fetch(`/api/v1/bq/datasets?project=${encodeURIComponent(project)}`);
+    const data = await res.json();
+    if (!res.ok) {
+      const errDetail = data.detail || 'Failed to connect to BigQuery';
+      if (res.status === 403 || errDetail.includes('403') || errDetail.includes('Access Denied')) {
+        if (loadBtn) {
+          loadBtn.disabled = false;
+          loadBtn.textContent = 'Load Datasets';
+        }
+        bqState.loadingDatasets = false;
+        showBQAuthRequired(project, errDetail, isMobile);
+        return;
+      }
+      throw new Error(errDetail);
+    }
+
+    bqState.datasets = data.datasets || [];
+    const promptOpt = `<option value="">Select a dataset (${bqState.datasets.length} available)</option>`;
+    
+    if (dsSel) {
+      dsSel.innerHTML = promptOpt;
+      bqState.datasets.forEach(d => {
+        const o = document.createElement('option');
+        o.value = d;
+        o.textContent = d;
+        dsSel.appendChild(o);
+      });
+      dsSel.disabled = false;
+    }
+
+    if (mobDsSel) {
+      mobDsSel.innerHTML = promptOpt;
+      bqState.datasets.forEach(d => {
+        const o = document.createElement('option');
+        o.value = d;
+        o.textContent = d;
+        mobDsSel.appendChild(o);
+      });
+      el('mobileBqSelects')?.classList.remove('hidden');
+    }
+
+    if (loadBtn) {
+      loadBtn.disabled = false;
+      loadBtn.textContent = 'Load Datasets';
+    }
+    bqState.loadingDatasets = false;
+
+    showBQStatus(`✓ ${bqState.datasets.length} datasets loaded successfully.`, 'success', isMobile);
+  } catch(e) {
+    if (loadBtn) {
+      loadBtn.disabled = false;
+      loadBtn.textContent = 'Load Datasets';
+    }
+    bqState.loadingDatasets = false;
+    showBQStatus(`Unable to load datasets: ${e.message || 'Please check Project ID.'}`, 'error', isMobile);
+  }
+}
+
+async function executeBQLoadTables(source = 'desktop') {
+  const isMobile = source === 'mobile';
+  const project = (el('bqProject')?.value || el('mobileBqProject')?.value || '').trim();
+  const dataset = isMobile ? el('mobileBqDataset')?.value : el('bqDataset')?.value;
+  bqState.selectedDataset = dataset;
+  bqState.tables = [];
+  bqState.selectedTable = '';
+
+  const tblSel = el('bqTable');
+  const mobTblSel = el('mobileBqTable');
+
+  if (tblSel) { tblSel.innerHTML = '<option value="">Loading tables...</option>'; tblSel.disabled = true; }
+  if (mobTblSel) { mobTblSel.innerHTML = '<option value="">Loading tables...</option>'; mobTblSel.disabled = true; }
+  validateBQForm();
+
+  if (!dataset) {
+    hideBQStatus();
+    return;
+  }
+
+  bqState.loadingTables = true;
+  showBQStatus(`Loading tables from ${dataset}...`, 'loading', isMobile);
+
+  try {
+    const res = await fetch(`/api/v1/bq/tables?project=${encodeURIComponent(project)}&dataset=${encodeURIComponent(dataset)}`);
+    const data = await res.json();
+    if (!res.ok) {
+      const errDetail = data.detail || 'Failed to list tables';
+      if (res.status === 403 || errDetail.includes('403') || errDetail.includes('Access Denied')) {
+        bqState.loadingTables = false;
+        showBQAuthRequired(project, errDetail, isMobile);
+        return;
+      }
+      throw new Error(errDetail);
+    }
+
+    bqState.tables = data.tables || [];
+    const promptOpt = `<option value="">Select table (${bqState.tables.length} available)</option>`;
+
+    if (tblSel) {
+      tblSel.innerHTML = promptOpt;
+      bqState.tables.forEach(t => {
+        const o = document.createElement('option');
+        o.value = t;
+        o.textContent = t;
+        tblSel.appendChild(o);
+      });
+      tblSel.disabled = false;
+    }
+
+    if (mobTblSel) {
+      mobTblSel.innerHTML = promptOpt;
+      bqState.tables.forEach(t => {
+        const o = document.createElement('option');
+        o.value = t;
+        o.textContent = t;
+        mobTblSel.appendChild(o);
+      });
+      mobTblSel.disabled = false;
+    }
+
+    bqState.loadingTables = false;
+    const rowInfo = el('bqTableRowInfo');
+    if (rowInfo) { rowInfo.innerHTML = ''; rowInfo.classList.add('hidden'); }
+    const mobRowInfo = el('mobileBqTableRowInfo');
+    if (mobRowInfo) { mobRowInfo.innerHTML = ''; mobRowInfo.classList.add('hidden'); }
+    showBQStatus(`✓ ${bqState.tables.length} tables loaded. Select a table.`, 'success', isMobile);
+  } catch(e) {
+    bqState.loadingTables = false;
+    if (tblSel) { tblSel.innerHTML = '<option value="">Error loading tables</option>'; tblSel.disabled = true; }
+    if (mobTblSel) { mobTblSel.innerHTML = '<option value="">Error loading tables</option>'; mobTblSel.disabled = true; }
+    showBQStatus(`Unable to load tables: ${e.message}`, 'error', isMobile);
+  }
+}
+
+async function onBQTableSelected(source = 'desktop') {
+  const isMobile = source === 'mobile';
+  const project = (el('bqProject')?.value || el('mobileBqProject')?.value || '').trim();
+  const dataset = isMobile ? el('mobileBqDataset')?.value : el('bqDataset')?.value;
+  const table = isMobile ? el('mobileBqTable')?.value : el('bqTable')?.value;
+
+  bqState.selectedTable = table;
+  const infoEl = isMobile ? el('mobileBqTableRowInfo') : el('bqTableRowInfo');
+  const importBtn = isMobile ? el('mobileBqImportBtn') : el('bqImportBtn');
+
+  if (!table) {
+    if (infoEl) {
+      infoEl.innerHTML = '';
+      infoEl.classList.add('hidden');
+    }
+    if (importBtn) {
+      importBtn.disabled = true;
+      importBtn.textContent = 'Import Selected Table';
+    }
+    return;
+  }
+
+  if (infoEl) {
+    infoEl.classList.remove('hidden');
+    infoEl.innerHTML = `
+      <div class="flex items-center gap-2 text-blue-300 font-semibold py-1">
+        <svg class="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+        <span>Inspecting BigQuery table rows...</span>
+      </div>`;
+  }
+  if (importBtn) importBtn.disabled = true;
+
+  try {
+    const res = await fetch(`/api/v1/bq/table-info?project=${encodeURIComponent(project)}&dataset=${encodeURIComponent(dataset)}&table=${encodeURIComponent(table)}`);
+    const data = await res.json();
+    bqState.tableInfo = data;
+
+    const totalRows = data.total_rows || 0;
+
+    if (infoEl) {
+      infoEl.classList.remove('hidden');
+      if (totalRows > 10000) {
+        infoEl.innerHTML = `
+          <div class="space-y-1">
+            <div class="flex items-center justify-between text-blue-300 font-bold">
+              <span>📊 Table Size: ${totalRows.toLocaleString()} rows</span>
+              <span class="px-2 py-0.5 rounded bg-blue-500/20 text-blue-200 text-[10px]">Sample Import</span>
+            </div>
+            <p class="text-slate-300 text-[11px]">Since this table has ${totalRows.toLocaleString()} rows, a maximum high-fidelity sample of <strong class="text-white font-bold">10,000 rows</strong> will be ingested into the Forge.</p>
+          </div>`;
+      } else if (totalRows > 0) {
+        infoEl.innerHTML = `
+          <div class="flex items-center justify-between text-emerald-300 font-bold">
+            <span>📊 Table Size: ${totalRows.toLocaleString()} rows</span>
+            <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-200 text-[10px]">Full Ingestion</span>
+          </div>
+          <p class="text-slate-300 text-[11px] mt-0.5">All <strong class="text-white font-bold">${totalRows.toLocaleString()} rows</strong> will be ingested into the Forge.</p>`;
+      } else {
+        infoEl.innerHTML = `<span class="text-blue-300 font-medium">Ingesting up to 10,000 rows for synthesis.</span>`;
+      }
+    }
+
+    if (importBtn) {
+      importBtn.disabled = false;
+      const count = totalRows > 10000 ? 10000 : (totalRows > 0 ? totalRows : 10000);
+      importBtn.textContent = totalRows > 10000 ? `Import 10,000 Sample Rows` : `Import ${count.toLocaleString()} Rows`;
+    }
+  } catch (err) {
+    if (infoEl) {
+      infoEl.classList.remove('hidden');
+      infoEl.innerHTML = `<span class="text-slate-400">Ingesting up to 10,000 rows for synthesis.</span>`;
+    }
+    if (importBtn) {
+      importBtn.disabled = false;
+      importBtn.textContent = 'Import Selected Table';
+    }
+  }
+}
+
+async function executeBQImport(source = 'desktop') {
+  const isMobile = source === 'mobile';
+  const project = (el('bqProject')?.value || el('mobileBqProject')?.value || '').trim();
+  const dataset = isMobile ? el('mobileBqDataset')?.value : el('bqDataset')?.value;
+  const table = isMobile ? el('mobileBqTable')?.value : el('bqTable')?.value;
+  const limit = bqState.tableInfo?.default_fetch || 10000;
+
+  if (!project || !dataset || !table) return;
+
+  bqState.importing = true;
+  const importBtn = isMobile ? el('mobileBqImportBtn') : el('bqImportBtn');
+  if (importBtn) {
+    importBtn.disabled = true;
+    importBtn.textContent = 'Importing table...';
+  }
+  showBQStatus(`Importing from ${dataset}.${table}...`, 'loading', isMobile);
+
+  try {
+    const res = await fetch('/api/v1/bq/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        project,
+        dataset,
+        table,
+        limit
+      })
+    });
+    const info = await res.json().catch(() => ({ detail: `Server error ${res.status}: ${res.statusText}` }));
+    if (!res.ok) throw new Error(info.detail || `Import failed (${res.status})`);
+
+    state.mode = 'upload';
+    state.upload = info;
+    state.dataset = null;
+
+    // Reset CSV card if a file was previously loaded there
+    resetCsvUpload();
+    state.mode = 'upload';
+    state.upload = info;
+
+    addToSidebarHistory({ type: 'bq', name: info.filename || `${dataset}.${table}`, details: `${info.rows.toLocaleString()} rows · BigQuery`, key: null });
+
+    // Transform Card 2 button area on Desktop
+    const shortName = `BQ: ${dataset}.${table}`;
+    const displayName = shortName.length > 28 ? shortName.slice(0,25)+'…' : shortName;
+    if (el('bqUploadArea')) {
+      el('bqUploadArea').innerHTML = `
+        <div class="w-full flex flex-col gap-2">
+          <div class="w-full flex items-center gap-2 px-4 py-3 rounded-xl bg-blue-500/10 border border-blue-500/40 text-blue-300 font-bold text-xs">
+            <svg class="w-4 h-4 shrink-0 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 7v10c0 2.21 3.58 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.58 4 8 4s8-1.79 8-4M4 7c0-2.21 3.58-4 8-4s8 1.79 8 4m0 5c0 2.21-3.58 4-8 4s-8-1.79-8-4"/></svg>
+            <span class="truncate" title="${dataset}.${table}">${displayName}</span>
+            <span class="ml-auto whitespace-nowrap text-blue-400/80">${info.rows.toLocaleString()} rows</span>
+          </div>
+          <button id="bqChangeBtn" type="button" class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 cursor-pointer transition font-semibold text-xs text-slate-300">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            Change Dataset
+          </button>
+        </div>`;
+      el('bqChangeBtn')?.addEventListener('click', resetBqImport);
+    }
+
+    notifyDatasetLoaded(info.rows, 'BigQuery Dataset', info.total_table_rows);
+
+    renderUploadConfig(info);
+    el('uploadConfig').scrollIntoView({ behavior: 'smooth' });
+
+    showBQStatus(`✓ Successfully imported ${info.rows.toLocaleString()} rows from ${dataset}.${table}.`, 'success', isMobile);
+
+    setTimeout(() => {
+      el('bqPanel')?.classList.add('hidden');
+      el('mobileBqDrawer')?.classList.add('hidden');
+      resetBQState();
+    }, 1000);
+  } catch(e) {
+    bqState.importing = false;
+    if (importBtn) {
+      importBtn.disabled = false;
+      importBtn.textContent = 'Import Selected Table';
+    }
+    showBQStatus(`Import failed: ${e.message}`, 'error', isMobile);
+  }
+}
+
+// ── Event Listeners ─────────────────────────────────────────────────────────
+
+// Open / Toggle Drawer
+el('bqTabBtn')?.addEventListener('click', ()=>{
+  const panel = el('bqPanel');
+  if(!panel) return;
+  const isOpen = !panel.classList.contains('hidden');
+  if (isOpen) {
+    panel.classList.add('hidden');
+    resetBQState();
+  } else {
+    panel.classList.remove('hidden');
+  }
+});
+
+// Close button X
+if (el('bqCloseBtn')) {
+  el('bqCloseBtn').addEventListener('click', ()=>{
+    el('bqPanel')?.classList.add('hidden');
+    resetBQState();
+  });
+}
+
+// Cancel button
+if (el('bqCancelBtn')) {
+  el('bqCancelBtn').addEventListener('click', ()=>{
+    el('bqPanel')?.classList.add('hidden');
+    resetBQState();
+  });
+}
+
+// Project ID change — clear datasets & tables
+el('bqProject')?.addEventListener('input', (e)=>{
+  const newProj = e.target.value.trim();
+  if (newProj !== bqState.project) {
+    bqState.project = newProj;
+    bqState.datasets = [];
+    bqState.selectedDataset = '';
+    bqState.tables = [];
+    bqState.selectedTable = '';
+
+    const dsSel = el('bqDataset');
+    if (dsSel) {
+      dsSel.innerHTML = '<option value="">Enter a Project ID and click "Load Datasets" to continue</option>';
+      dsSel.disabled = true;
+    }
+
+    const tblSel = el('bqTable');
+    if (tblSel) {
+      tblSel.innerHTML = '<option value="">Select a dataset first</option>';
+      tblSel.disabled = true;
+    }
+
+    hideBQStatus();
+    validateBQForm();
+  }
+});
+
+// Step 3: Load Datasets
+el('bqLoadDatasets')?.addEventListener('click', () => executeBQLoadDatasets('desktop'));
+
+// Step 4: Dataset change -> load tables
+el('bqDataset')?.addEventListener('change', () => executeBQLoadTables('desktop'));
+
+// Step 5: Table change
+el('bqTable')?.addEventListener('change', ()=>{
+  onBQTableSelected('desktop');
+});
+
+// Step 6: Import Selected Table
+el('bqImportBtn')?.addEventListener('click', () => executeBQImport('desktop'));
+
+function renderMobileCsvInitial(){
+  const container = el('mobileCsvContainer');
+  if(!container) return;
+  container.innerHTML = `
+    <input id="mobileFileInput" type="file" accept=".csv,text/csv,text/plain,application/vnd.ms-excel,text/comma-separated-values,application/csv,application/octet-stream" class="hidden" />
+    <label id="mobileCsvCard" for="mobileFileInput" class="p-3.5 rounded-2xl bg-slate-900/80 hover:bg-slate-900 border border-slate-800/80 hover:border-indigo-500/50 shadow-md backdrop-blur-xl flex items-center justify-between gap-3 cursor-pointer transition active:scale-[0.98] group block">
+      <div class="flex items-center gap-3 min-w-0">
+        <div class="h-10 w-10 rounded-xl bg-indigo-500/15 text-indigo-400 grid place-items-center border border-indigo-500/30 text-lg shrink-0 group-hover:scale-105 transition-transform">
+          <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+        </div>
+        <div class="min-w-0">
+          <h4 class="font-extrabold text-xs text-slate-100 leading-tight">Upload CSV</h4>
+          <p class="text-[10px] text-slate-400 mt-0.5 truncate">Tap to browse CSV from device</p>
+        </div>
+      </div>
+      <div class="h-7 w-7 rounded-full bg-slate-800/80 group-hover:bg-indigo-600/30 text-slate-400 group-hover:text-white grid place-items-center shrink-0 border border-slate-700/80 transition">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+      </div>
+    </label>
+    <div id="mobileUploadStatus" class="hidden text-xs py-2.5 px-3.5 rounded-xl font-medium border border-slate-800 bg-slate-950/80"></div>
+  `;
+  const mInput = el('mobileFileInput');
+  if(mInput) mInput.addEventListener('change', handleUpload);
+}
+
+function renderMobileCsvLoaded(file, info){
+  const container = el('mobileCsvContainer');
+  if(!container) return;
+  const shortName = file.name.length > 25 ? file.name.slice(0, 22) + '…' : file.name;
+  container.innerHTML = `
+    <div class="p-3.5 rounded-2xl bg-slate-900/90 border border-emerald-500/50 shadow-md backdrop-blur-xl flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <div class="h-10 w-10 rounded-xl bg-emerald-500/15 text-emerald-400 grid place-items-center border border-emerald-500/30 text-lg shrink-0">
+          <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+        </div>
+        <div class="min-w-0">
+          <h4 class="font-extrabold text-xs text-slate-100 truncate">${shortName}</h4>
+          <p class="text-[10px] text-emerald-400 mt-0.5 font-medium">${info.rows.toLocaleString()} rows · CSV loaded</p>
+        </div>
+      </div>
+      <button id="mobileCsvChangeBtn" type="button" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-200 hover:text-white font-bold text-[11px] border border-slate-700 transition shrink-0 shadow">
+        Change
+      </button>
+    </div>
+    <div id="mobileUploadStatus" class="hidden text-xs py-2.5 px-3.5 rounded-xl font-medium border border-slate-800 bg-slate-950/80"></div>
+  `;
+  const changeBtn = el('mobileCsvChangeBtn');
+  if(changeBtn) changeBtn.addEventListener('click', resetCsvUpload);
+}
+
+function resetCsvUpload(){
+  state.upload = null;
+  const deskArea = el('csvUploadArea');
+  if(deskArea){
+    deskArea.innerHTML = `
+      <label id="csvUploadLabel" class="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 cursor-pointer transition font-bold text-xs text-white shadow-lg shadow-indigo-600/30">
+        <span>📂</span> Upload CSV
+        <input id="fileInput" type="file" accept=".csv,text/csv,text/plain,application/vnd.ms-excel,text/comma-separated-values,application/csv,application/octet-stream" class="hidden" />
+      </label>`;
+    const fi = el('fileInput');
+    if(fi) fi.addEventListener('change', handleUpload);
+  }
+  renderMobileCsvInitial();
+
+  const st = el('uploadStatus');
+  if(st){ st.classList.add('hidden'); st.textContent = ''; }
+  const mSt = el('mobileUploadStatus');
+  if(mSt){ mSt.classList.add('hidden'); mSt.textContent = ''; }
+
+  el('uploadConfig').classList.add('hidden');
+  el('runBtn').textContent = 'Forge Synthetic Data';
+}
+
+function resetBqImport(){
+  state.upload = null;
+  el('bqUploadArea').innerHTML = `
+    <button id="bqTabBtn" type="button" class="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 cursor-pointer transition font-bold text-xs text-white shadow-lg shadow-indigo-600/30">
+      <span>🔷</span> Connect BigQuery
+    </button>`;
+  el('bqTabBtn').addEventListener('click', () => {
+    el('bqPanel').classList.remove('hidden');
+    el('bqPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+  el('uploadConfig').classList.add('hidden');
+  el('runBtn').textContent = 'Forge Synthetic Data';
+}
+
+async function handleUpload(ev){
+  const file = ev.target.files && ev.target.files[0];
+  if(!file) return;
+  // Reset input value so re-uploading identical file fires change again
+  ev.target.value = '';
+
+  const st = el('uploadStatus');
+  if(st){
+    st.classList.remove('hidden');
+    st.className = 'text-xs mt-3 text-slate-400 font-medium flex items-center gap-2';
+    st.innerHTML = `<svg class="animate-spin h-3.5 w-3.5 text-indigo-400" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg><span>Uploading & profiling ${file.name}…</span>`;
+  }
+
+  const mSt = el('mobileUploadStatus');
+  if(mSt){
+    mSt.classList.remove('hidden');
+    mSt.className = 'text-xs py-2.5 px-3.5 rounded-xl mt-2 font-medium border border-indigo-500/30 bg-indigo-950/50 text-indigo-300 flex items-center gap-2';
+    mSt.innerHTML = `<svg class="animate-spin h-3.5 w-3.5 text-indigo-400 shrink-0" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg><span>Uploading & profiling ${file.name}…</span>`;
+  }
+
+  const fd = new FormData();
+  fd.append('file', file);
+  let res;
+  try {
+    res = await fetch('/api/v1/upload', { method: 'POST', body: fd });
+  } catch(e){
+    const msg = 'Upload failed: ' + (e.message || e);
+    if(st){ st.className = 'text-xs mt-3 text-rose-300 font-bold'; st.textContent = msg; }
+    if(mSt){ mSt.className = 'text-xs py-2.5 px-3.5 rounded-xl mt-2 font-medium border border-rose-500/40 bg-rose-950/50 text-rose-300'; mSt.textContent = msg; }
+    return;
+  }
+  if(!res.ok){
+    const errObj = await res.json().catch(()=>({ detail: res.statusText }));
+    const msg = 'Rejected: ' + (errObj.detail || res.status);
+    if(st){ st.className = 'text-xs mt-3 text-rose-300 font-bold'; st.textContent = msg; }
+    if(mSt){ mSt.className = 'text-xs py-2.5 px-3.5 rounded-xl mt-2 font-medium border border-rose-500/40 bg-rose-950/50 text-rose-300'; mSt.textContent = msg; }
+    return;
+  }
+
+  const info = await res.json();
+  resetBqImport();
+  state.mode = 'upload';
+  state.dataset = null;
+  state.upload = info;
+  addToSidebarHistory({ type: 'csv', name: file.name, details: `${info.rows.toLocaleString()} rows · CSV`, key: null });
+
+  // Transform Desktop upload button area into a loaded-state badge
+  const shortName = file.name.length > 28 ? file.name.slice(0, 25) + '…' : file.name;
+  if(el('csvUploadArea')){
+    el('csvUploadArea').innerHTML = `
+      <div class="w-full flex flex-col gap-2">
+        <div class="w-full flex items-center gap-2 px-4 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/40 text-emerald-300 font-bold text-xs">
+          <svg class="w-4 h-4 shrink-0 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+          <span class="truncate" title="${file.name}">${shortName}</span>
+          <span class="ml-auto whitespace-nowrap text-emerald-400/80">${info.rows.toLocaleString()} rows</span>
+        </div>
+        <button id="csvChangeBtn" type="button" class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-600 cursor-pointer transition font-semibold text-xs text-slate-300">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          Change File
+        </button>
+      </div>`;
+    el('csvChangeBtn')?.addEventListener('click', resetCsvUpload);
+  }
+
+  // Transform Mobile upload card into loaded badge
+  renderMobileCsvLoaded(file, info);
+
+  if(st) st.classList.add('hidden');
+  if(mSt) mSt.classList.add('hidden');
+
+  notifyDatasetLoaded(info.rows, 'CSV File');
+  renderUploadConfig(info);
+
+  // Smoothly scroll down to column configuration
+  el('uploadConfig')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderUploadConfig(info){
+  const sel=el('labelSelect'); sel.innerHTML='';
+  info.columns.forEach(c=>{
+    const o=document.createElement('option'); o.value=c; o.textContent=c;
+    if(c===info.label_column) o.selected=true; sel.appendChild(o);
+  });
+  const chips=el('qiChips'); chips.innerHTML='';
+  const selected=new Set(info.quasi_identifiers);
+  info.columns.forEach(c=>{
+    const b=document.createElement('button'); b.dataset.col=c; b.type='button';
+    const on=selected.has(c);
+    b.className='qi-chip text-xs px-3 py-1.5 rounded-full border font-semibold transition '+
+      (on?'bg-indigo-500/20 border-indigo-500 text-indigo-200 shadow-sm':'bg-slate-800 border-slate-700 text-slate-400');
+    b.textContent=c; b.dataset.on=on?'1':'0';
+    b.onclick=()=>{ const nowOn=b.dataset.on!=='1'; b.dataset.on=nowOn?'1':'0';
+      b.className='qi-chip text-xs px-3 py-1.5 rounded-full border font-semibold transition '+
+        (nowOn?'bg-indigo-500/20 border-indigo-500 text-indigo-200 shadow-sm':'bg-slate-800 border-slate-700 text-slate-400'); };
+    chips.appendChild(b);
+  });
+  el('uploadMeta').textContent=`${info.sensitive_columns.length} sensitive column(s) detected`;
+  el('uploadConfig').classList.remove('hidden');
+}
+
+function selectedQIs(){
+  return [...document.querySelectorAll('#qiChips .qi-chip')].filter(b=>b.dataset.on==='1').map(b=>b.dataset.col);
+}
+
+async function checkLLM(){
+  try {
+    const h=await (await fetch('/health')).json();
+    const badge=el('llmBadge');
+    if(badge) badge.classList.add('hidden');
+  } catch(e){}
+}
+
+function renderCast(){
+  const c=el('cast'); c.innerHTML='';
+  Object.entries(AGENTS).forEach(([k,a])=>{
+    const d=document.createElement('div');
+    d.id='agent-'+k;
+    d.className='rounded-2xl p-4 border border-slate-800 bg-slate-900 transition shadow-sm';
+    d.innerHTML=`<div class="flex items-center gap-2">
+        <span class="text-2xl">${a.emoji}</span>
+        <div><div class="font-bold text-slate-100 leading-tight">${a.name}</div>
+        <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">${a.role}</div></div>
+        <span id="agent-status-${k}" class="ml-auto h-2.5 w-2.5 rounded-full bg-slate-700"></span>
+      </div>
+      <div id="agent-msg-${k}" class="text-xs text-slate-400 mt-3 min-h-[2.5rem] leading-snug">idle</div>`;
+    c.appendChild(d);
+  });
+}
+function setAgent(k, msg, done){
+  const card=el('agent-'+k), dot=el('agent-status-'+k), m=el('agent-msg-'+k);
+  if(!card) return;
+  Object.keys(AGENTS).forEach(x=>{ const e=el('agent-'+x); if(e) e.classList.remove('agent-active','border-indigo-500'); });
+  if(!done){ card.classList.add('agent-active','border-indigo-500'); dot.className='ml-auto h-2.5 w-2.5 rounded-full bg-indigo-400'; }
+  else { dot.className='ml-auto h-2.5 w-2.5 rounded-full bg-emerald-400'; }
+  if(msg) m.textContent=msg;
+}
+
+function bar(label, value, good, threshold, thresholdLabel){
+  const okColor = good ? 'bg-emerald-500' : 'bg-rose-500';
+  const v=Math.max(0,Math.min(1,value));
+  return `<div class="flex justify-between text-xs mb-1 font-semibold"><span class="text-slate-400">${label}</span>
+      <span class="font-bold text-slate-100">${pct(value)}</span></div>
+    <div class="h-3 rounded-full bg-slate-950 overflow-hidden relative border border-slate-800">
+      <div class="bar h-full ${okColor}" style="width:${v*100}%"></div>
+      ${threshold!=null?`<div class="absolute top-0 h-full w-px bg-white/60" style="left:${threshold*100}%" title="${thresholdLabel}"></div>`:''}
+    </div>`;
+}
+function updateMetrics(u,a){
+  el('mUtility').innerHTML   = bar('TSTR utility ratio', u.utility_ratio, true, state.thresholds.tstr_min, 'target');
+  el('mFidelity').innerHTML  = bar('Distribution fidelity', u.fidelity_score, true, state.thresholds.fidelity_min, 'min');
+  el('mQuery').innerHTML     = bar('Query equivalence', u.query_equivalence, true, state.thresholds.query_equivalence_min, 'target');
+  el('mReid').innerHTML      = bar('Re-identification', a.re_id_rate, false, state.thresholds.reid_max, 'max allowed');
+  el('mMembership').innerHTML= bar('Membership leakage', a.membership_accuracy, false, state.thresholds.membership_max, 'max allowed');
+}
+
+function logLine(agentKey, msg, done){
+  const a=AGENTS[agentKey]||{name:'System',emoji:'•',color:'slate'};
+  const wrap=el('log');
+  const div=document.createElement('div');
+  div.className='fade-in bg-slate-800/40 border border-slate-800 rounded-xl px-3.5 py-2 font-medium';
+  div.innerHTML=`<span class="text-indigo-400 font-bold">${a.emoji} ${a.name}:</span>
+    <span class="text-slate-300">${msg}</span>`;
+  wrap.prepend(div);
+}
+
+function addRoundRow(r){
+  const u=r.utility,a=r.attack;
+  const tr=document.createElement('tr'); tr.className='fade-in hover:bg-slate-800/40';
+  const ok=r.passed;
+  tr.innerHTML=`<td class="px-4 py-2.5 font-bold text-slate-200">${r.round_index}</td>
+    <td class="px-4 py-2.5 text-right font-medium">${pct(u.utility_ratio)}</td>
+    <td class="px-4 py-2.5 text-right font-medium">${pct(u.fidelity_score)}</td>
+    <td class="px-4 py-2.5 text-right font-medium ${a.re_id_rate>state.thresholds.reid_max?'text-rose-300 font-bold':'text-emerald-300'}">${pct(a.re_id_rate)}</td>
+    <td class="px-4 py-2.5 text-right font-medium ${a.membership_accuracy>state.thresholds.membership_max?'text-rose-300 font-bold':'text-emerald-300'}">${pct(a.membership_accuracy)}</td>
+    <td class="px-4 py-2.5 text-center">${ok?'✅':'❌'}</td>`;
+  el('roundsBody').appendChild(tr);
+}
+
+function showDifficulty(ev){
+  const b=el('difficultyBanner');
+  const map={ easy:'border-emerald-700 bg-emerald-500/10 text-emerald-200',
+              moderate:'border-amber-700 bg-amber-500/10 text-amber-200',
+              hard:'border-rose-700 bg-rose-500/10 text-rose-200' };
+  b.className='mb-6 rounded-3xl p-5 border fade-in shadow-md '+(map[ev.difficulty]||map.moderate);
+  b.innerHTML=`<div class="flex items-center gap-2 font-bold uppercase tracking-wider text-xs">
+      Difficulty: ${ev.difficulty} · ${ev.rows.toLocaleString()} rows · ${(ev.quasi_identifiers||[]).length} quasi-identifiers</div>
+    <div class="text-sm mt-1 text-slate-300 leading-relaxed font-medium">${ev.difficulty_detail}</div>`;
+  b.classList.remove('hidden');
+}
+
+let activeEventSource = null;
+let currentRunId = null;
+
+function promptAbortRun(){
+  const m = el('abortModal');
+  if(m) {
+    m.classList.remove('hidden');
+    lockBodyScroll();
+  }
+}
+
+function closeAbortModal(){
+  const m = el('abortModal');
+  if(m) {
+    m.classList.add('hidden');
+    unlockBodyScroll();
+  }
+}
+
+function resetAllDatasetSelections(){
+  resetCsvUpload();
+  resetBqImport();
+  clearSampleSelection();
+  state.mode = null;
+  state.dataset = null;
+  state.upload = null;
+  state.runId = null;
+  activeHistoryId = null;
+  renderSidebarHistory();
+  el('uploadConfig').classList.add('hidden');
+  const st = el('uploadStatus');
+  if(st){ st.classList.add('hidden'); st.textContent = ''; }
+  const customIndicator = el('customActiveIndicator');
+  if(customIndicator) customIndicator.remove();
+  
+  currentSourceRows = 0;
+  currentMinRows = 500;
+  const notice = el('datasetRowNotice');
+  if(notice) notice.classList.add('hidden');
+  const input = el('nRows');
+  if(input) {
+    input.value = '';
+    input.placeholder = 'Enter row count (500 – 10,000)';
+  }
+  const errEl = el('nRowsError');
+  if(errEl) errEl.classList.add('hidden');
+  validateForgeReady();
+}
+
+async function confirmAbortRun(){
+  closeAbortModal();
+  if(activeEventSource) {
+    activeEventSource.close();
+    activeEventSource = null;
+  }
+  if(currentRunId){
+    try {
+      await fetch('/api/v1/forge/abort', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ run_id: currentRunId })
+      });
+    } catch(e) {
+      console.warn('Abort request error:', e);
+    }
+  }
+  
+  updateActiveHistoryStatus('ABORTED');
+  
+  // Hide active stream cards & scorecard
+  ['castSection','metricsSection','liveSection','scorecardSection','difficultyBanner'].forEach(id=>el(id).classList.add('hidden'));
+  
+  // Reset run buttons
+  el('runBtn').disabled = false;
+  el('runBtn').classList.remove('hidden');
+  el('abortBtn').classList.add('hidden');
+
+  // Completely reset selected datasets (CSV, BigQuery, Samples)
+  resetAllDatasetSelections();
+
+  logLine(null, '🛑 Run execution aborted by user. Zero synthetic data generated.');
+}
+
+function run(){
+  // Guard: nothing selected yet
+  if(!state.mode || (!state.upload && !state.dataset)){
+    alert('Please select a dataset first — upload a CSV, connect BigQuery, or choose a sample dataset below.');
+    return;
+  }
+
+  if(!validateForgeReady()){
+    const input = el('nRows');
+    if(input) {
+      input.focus();
+      input.classList.add('ring-2', 'ring-rose-500');
+      setTimeout(() => input.classList.remove('ring-rose-500'), 2000);
+    }
+    const errEl = el('nRowsError');
+    if(errEl) {
+      errEl.classList.remove('hidden');
+      errEl.innerHTML = `⚠️ <span>Please enter the number of rows to forge (between ${(currentMinRows || 500).toLocaleString()} and 10,000).</span>`;
+    }
+    return;
+  }
+
+  const nRows = parseInt(el('nRows').value, 10);
+  let url;
+  if(state.mode==='upload'){
+    if(!state.upload) return;
+    const qis=selectedQIs();
+    if(qis.length===0){ alert('Select at least one quasi-identifier to attack.'); return; }
+    const label=el('labelSelect').value;
+    url=`/api/v1/forge/stream?upload_id=${encodeURIComponent(state.upload.upload_id)}&n_rows=${nRows}`+
+        `&label=${encodeURIComponent(label)}&quasi_identifiers=${encodeURIComponent(qis.join(','))}`+
+        `&sensitive_columns=${encodeURIComponent((state.upload.sensitive_columns||[]).join(','))}`;
+  } else {
+    if(!state.dataset) return;
+    url=`/api/v1/forge/stream?dataset_key=${encodeURIComponent(state.dataset)}&n_rows=${nRows}`;
+  }
+
+
+  ['roundsBody','log'].forEach(id=>el(id).innerHTML='');
+  renderCast();
+  ['castSection','metricsSection','liveSection'].forEach(id=>el(id).classList.remove('hidden'));
+  el('scorecardSection').classList.add('hidden');
+  el('runBtn').disabled=true;
+  el('runBtn').classList.add('hidden');
+  el('abortBtn').classList.remove('hidden');
+
+  if(activeEventSource) activeEventSource.close();
+  const es=new EventSource(url);
+  activeEventSource=es;
+
+  es.onmessage=(e)=>{
+    let ev;
+    try {
+      ev = JSON.parse(e.data);
+    } catch(err){
+      console.warn('Malformed SSE data packet:', e.data);
+      return;
+    }
+    switch(ev.type){
+      case 'loaded':
+        if(ev.run_id) currentRunId = ev.run_id;
+        if(ev.thresholds) state.thresholds=ev.thresholds;
+        showDifficulty(ev);
+        logLine(null, `Loaded ${ev.rows.toLocaleString()} real rows from ${ev.domain}. Profiling (raw rows never sent to the LLM).`);
+        break;
+      case 'round_start':
+        el('roundPill').textContent='Round '+ev.round;
+        Object.keys(AGENTS).forEach(k => {
+          const dot = el('agent-status-' + k);
+          if (dot) dot.className = 'ml-auto h-2.5 w-2.5 rounded-full bg-slate-700';
+          const card = el('agent-' + k);
+          if (card) card.classList.remove('agent-active', 'border-indigo-500');
+          const m = el('agent-msg-' + k);
+          if (m && ev.round > 1) m.textContent = 'waiting...';
+        });
+        break;
+      case 'agent':
+        setAgent(ev.agent, ev.message, ev.done);
+        if(ev.done || ev.agent==='attacker' || ev.agent==='orchestrator') logLine(ev.agent, ev.message, ev.done);
+        break;
+      case 'round_result':
+        updateMetrics(ev.result.utility, ev.result.attack);
+        addRoundRow(ev.result);
+        break;
+      case 'done':
+        finish(ev.response); es.close(); activeEventSource=null; break;
+      case 'error':
+        logLine(null, '❌ Error: ' + ev.message);
+        el('runBtn').classList.remove('hidden');
+        el('abortBtn').classList.add('hidden');
+        Object.keys(AGENTS).forEach(k=>setAgent(k, null, true));
+        validateForgeReady();
+        es.close(); activeEventSource=null; break;
+    }
+  };
+  es.onerror=()=>{
+    el('runBtn').classList.remove('hidden');
+    el('abortBtn').classList.add('hidden');
+    Object.keys(AGENTS).forEach(k=>setAgent(k, null, true));
+    validateForgeReady();
+    if(activeEventSource){
+      logLine(null, '⚠️ Connection interrupted or disconnected from server. If synthesizing 10,000 rows, please retry or verify network.');
+      activeEventSource.close();
+      activeEventSource=null;
+    }
+  };
+}
+
+function finish(resp){
+  el('runBtn').classList.remove('hidden');
+  el('abortBtn').classList.add('hidden');
+  validateForgeReady();
+
+  if(resp && resp.status === 'ABORTED'){
+    logLine(null, '🛑 Execution aborted. Zero synthetic data generated.');
+    updateActiveHistoryStatus('ABORTED');
+    ['castSection','metricsSection','liveSection','scorecardSection','difficultyBanner'].forEach(id=>el(id).classList.add('hidden'));
+    return;
+  }
+
+  updateActiveHistoryStatus(resp ? resp.status : 'SUCCESS', resp);
+  Object.keys(AGENTS).forEach(k=>setAgent(k,null,true));
+  
+  const downloadUrl = `/api/v1/export/${resp.run_id}?format=csv`;
+  el('topDownloadBtn').href = downloadUrl;
+  const topBqBtn = el('topBqExportBtn');
+  if (topBqBtn) {
+    const dsName = state.dataset || (state.upload ? state.upload.filename : 'synthetic_dataset');
+    topBqBtn.onclick = () => openBqExportModal(resp.run_id, dsName);
+  }
+
+  renderScorecard(resp);
+
+  if (resp.rounds && resp.rounds.length > 0) {
+    const finalRound = resp.rounds[resp.rounds.length - 1];
+    const u = finalRound.utility;
+    const a = finalRound.attack;
+    updateMetrics(u, a);
+    el('roundsBody').innerHTML = '';
+    resp.rounds.forEach(r => addRoundRow(r));
+  }
+
+  const isOk = resp.status === 'SUCCESS';
+  const verdict = isOk
+    ? '✅ Converged: proven USEFUL and SAFE.'
+    : '⚠️ Honest verdict: could not certify safety on this dataset (best attempt ready for download).';
+  logLine(null, verdict);
+  el('runBtn').disabled = false;
+}
+
+function startNewAnalysis(){
+  // Hide all result sections
+  ['castSection','metricsSection','liveSection','scorecardSection','difficultyBanner'].forEach(id => {
+    const s = el(id); if(s){ s.classList.add('hidden'); }
+  });
+  // Clear round table + log
+  ['roundsBody','log'].forEach(id => { const e = el(id); if(e) e.innerHTML=''; });
+  
+  // Completely reset selected datasets (CSV, BigQuery, and Samples)
+  resetAllDatasetSelections();
+
+  // Scroll back to top smoothly
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+el('runBtn').onclick=run;
+el('nRows')?.addEventListener('input', validateForgeReady);
+validateForgeReady();
+el('fileInput')?.addEventListener('change', handleUpload);
+el('mobileFileInput')?.addEventListener('change', handleUpload);
+
+const uploadCard = el('uploadCsvCard');
+if (uploadCard) {
+  uploadCard.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadCard.classList.add('border-indigo-500', 'bg-indigo-950/40', 'ring-2', 'ring-indigo-500/40');
+  });
+  uploadCard.addEventListener('dragleave', () => {
+    uploadCard.classList.remove('border-indigo-500', 'bg-indigo-950/40', 'ring-2', 'ring-indigo-500/40');
+  });
+  uploadCard.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadCard.classList.remove('border-indigo-500', 'bg-indigo-950/40', 'ring-2', 'ring-indigo-500/40');
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      el('fileInput').files = e.dataTransfer.files;
+      const event = new Event('change');
+      el('fileInput').dispatchEvent(event);
+    }
+  });
+}
+
+function highlightSampleSection(e){
+  if(e) e.preventDefault();
+  const sec = el('sampleDatasetsSection');
+  if(!sec) return;
+  sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  // Remove class first in case it's already animating
+  sec.classList.remove('section-highlight');
+  // Force reflow so the animation restarts cleanly
+  void sec.offsetWidth;
+  sec.classList.add('section-highlight');
+  // Clean up after animation completes
+  setTimeout(() => sec.classList.remove('section-highlight'), 3600);
+}
+
+function toggleSampleSection(){
+  const wrapper = el('sampleGridWrapper');
+  const chevron = el('sampleChevron');
+  const label   = el('sampleCollapseLabel');
+  const isOpen  = wrapper.style.display !== 'none';
+  if(isOpen){
+    // Collapse
+    wrapper.style.overflow = 'hidden';
+    wrapper.style.maxHeight = wrapper.scrollHeight + 'px';
+    requestAnimationFrame(() => {
+      wrapper.style.transition = 'max-height 0.35s ease, opacity 0.3s ease';
+      wrapper.style.maxHeight = '0px';
+      wrapper.style.opacity   = '0';
+    });
+    setTimeout(() => { wrapper.style.display = 'none'; }, 360);
+    chevron.style.transform = 'rotate(180deg)';
+    label.textContent = 'Expand';
+  } else {
+    // Expand
+    wrapper.style.display = 'block';
+    wrapper.style.maxHeight = '0px';
+    wrapper.style.opacity   = '0';
+    requestAnimationFrame(() => {
+      wrapper.style.transition = 'max-height 0.4s ease, opacity 0.35s ease';
+      wrapper.style.maxHeight  = '600px';
+      wrapper.style.opacity    = '1';
+    });
+    chevron.style.transform = 'rotate(0deg)';
+    label.textContent = 'Collapse';
+  }
+}
+
+// ── BigQuery Export Handlers ────────────────────────────────────────────────
+let currentExportRunId = null;
+
+function resetBqExportButton() {
+  const submitBtn = el('bqExportSubmitBtn');
+  if (!submitBtn) return;
+  submitBtn.disabled = false;
+  submitBtn.onclick = executeBqExport;
+  submitBtn.className = 'w-full sm:w-auto px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs shadow-lg shadow-blue-600/30 transition flex items-center justify-center gap-1.5 cursor-pointer';
+  submitBtn.innerHTML = '<span>🚀</span> Export to BigQuery';
+}
+
+function openBqExportModal(runId, defaultDatasetName = '') {
+  currentExportRunId = runId || (state.activeResult ? state.activeResult.run_id : null);
+  if (!currentExportRunId) {
+    alert('No active run ID found to export.');
+    return;
+  }
+  
+  const modal = el('bqExportModal');
+  if (!modal) return;
+  
+  if (el('bqExportRunId')) el('bqExportRunId').value = currentExportRunId;
+  
+  // Prepopulate Project ID from existing input or config
+  const existingProject = (el('bqProject')?.value || el('mobileBqProject')?.value || '').trim();
+  const projInput = el('bqExportProject');
+  if (projInput && existingProject && !projInput.value) {
+    projInput.value = existingProject;
+  }
+  
+  // Prepopulate Table Name
+  const cleanDs = (defaultDatasetName || state.dataset || 'synthetic_data')
+    .toString()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, '_')
+    .replace(/^_+|_+$/g, '');
+  const shortId = currentExportRunId.slice(0, 8);
+  const tblInput = el('bqExportTable');
+  if (tblInput) {
+    tblInput.value = `synth_${cleanDs || 'data'}_${shortId}`;
+  }
+  
+  // Reset Status & Button
+  const statusBox = el('bqExportStatus');
+  if (statusBox) {
+    statusBox.className = 'hidden';
+    statusBox.innerHTML = '';
+  }
+  resetBqExportButton();
+  
+  modal.classList.remove('hidden');
+  document.body.classList.add('modal-open');
+}
+
+function closeBqExportModal() {
+  const modal = el('bqExportModal');
+  if (modal) modal.classList.add('hidden');
+  document.body.classList.remove('modal-open');
+}
+
+// Reset button when user modifies export parameters
+['bqExportProject', 'bqExportDataset', 'bqExportTable'].forEach(id => {
+  el(id)?.addEventListener('input', () => {
+    const submitBtn = el('bqExportSubmitBtn');
+    if (submitBtn && submitBtn.onclick !== executeBqExport) {
+      resetBqExportButton();
+      const statusBox = el('bqExportStatus');
+      if (statusBox) {
+        statusBox.className = 'hidden';
+        statusBox.innerHTML = '';
+      }
+    }
+  });
+});
+
+async function executeBqExport() {
+  const runId = el('bqExportRunId')?.value || currentExportRunId;
+  const project = (el('bqExportProject')?.value || '').trim();
+  const dataset = (el('bqExportDataset')?.value || '').trim();
+  const table = (el('bqExportTable')?.value || '').trim();
+  const submitBtn = el('bqExportSubmitBtn');
+  
+  if (!runId) {
+    showExportStatus('Missing run ID for export.', 'error');
+    return;
+  }
+  if (!project) {
+    showExportStatus('Please enter a target GCP Project ID.', 'error');
+    return;
+  }
+  if (!dataset) {
+    showExportStatus('Please enter a target BigQuery dataset ID.', 'error');
+    return;
+  }
+  if (!table) {
+    showExportStatus('Please enter a destination BigQuery table name.', 'error');
+    return;
+  }
+  
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="inline-block animate-spin">⏳</span> Exporting to BigQuery...';
+  }
+  showExportStatus('Uploading synthetic dataset to BigQuery. Please wait...', 'loading');
+  
+  try {
+    const res = await fetch('/api/v1/bq/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ run_id: runId, project, dataset, table })
+    });
+    
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.detail || 'Export to BigQuery failed');
+    }
+    
+    showExportStatus(
+      `<strong>✅ Export Successful!</strong><br>` +
+      `Exported <strong>${Number(data.rows).toLocaleString()}</strong> synthetic rows to BigQuery table:<br>` +
+      `<code class="text-blue-300 font-mono select-all bg-slate-950 px-2 py-1 rounded mt-1.5 inline-block text-[11px] border border-slate-800">${escapeHtml(data.table_id || `${project}.${dataset}.${table}`)}</code>`,
+      'success'
+    );
+    
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.onclick = closeBqExportModal;
+      submitBtn.className = 'w-full sm:w-auto px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-lg shadow-emerald-600/30 transition flex items-center justify-center gap-1.5 cursor-pointer';
+      submitBtn.innerHTML = '<span>✓</span> Done (Close)';
+    }
+  } catch (err) {
+    showExportStatus(`<strong>⚠️ Export Failed:</strong> ${escapeHtml(err.message)}`, 'error');
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.onclick = executeBqExport;
+      submitBtn.className = 'w-full sm:w-auto px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs shadow-lg shadow-blue-600/30 transition flex items-center justify-center gap-1.5 cursor-pointer';
+      submitBtn.innerHTML = '<span>🚀</span> Retry Export';
+    }
+  }
+}
+
+function showExportStatus(message, type = 'info') {
+  const box = el('bqExportStatus');
+  if (!box) return;
+  box.classList.remove('hidden');
+  
+  if (type === 'loading') {
+    box.className = 'p-3.5 rounded-xl border text-xs space-y-1 bg-blue-500/10 border-blue-500/30 text-blue-200';
+  } else if (type === 'success') {
+    box.className = 'p-3.5 rounded-xl border text-xs space-y-1 bg-emerald-500/10 border-emerald-500/30 text-emerald-200';
+  } else if (type === 'error') {
+    box.className = 'p-3.5 rounded-xl border text-xs space-y-1 bg-rose-500/10 border-rose-500/30 text-rose-200';
+  } else {
+    box.className = 'p-3.5 rounded-xl border text-xs space-y-1 bg-slate-800/80 border-slate-700 text-slate-200';
+  }
+  box.innerHTML = message;
+}
+
+loadHistory(); loadDatasets(); checkLLM();
+
+</script>
+</body>
+</html>
