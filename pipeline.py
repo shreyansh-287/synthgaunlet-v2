@@ -42,6 +42,8 @@ logger = logging.getLogger("forge.pipeline")
 
 # In-memory registry of the latest synthetic frames, keyed by run_id (for export).
 _RUN_CACHE: Dict[str, pd.DataFrame] = {}
+# Passing candidates only, keyed by run_id then candidate_id. The slider may switch among these.
+_PASSING_FRAMES: Dict[str, Dict[str, pd.DataFrame]] = {}
 _RUN_STATES: Dict[str, dict] = {}
 _RUN_LOCK = threading.RLock()
 _RUN_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="synthgauntlet")
@@ -76,6 +78,7 @@ def abort_run(run_id: str) -> bool:
         if "progress" not in state:
             state["progress"] = []
         _RUN_CACHE.pop(run_id, None)
+        _PASSING_FRAMES.pop(run_id, None)
         _record_event(run_id, {"type": "aborted", "message": "Execution aborted by user. Zero data generated."})
         return True
 
@@ -119,6 +122,32 @@ def start_run(req: ForgeRequest) -> RunStartResponse:
 
 def get_run_frame(run_id: str) -> Optional[pd.DataFrame]:
     return _RUN_CACHE.get(run_id)
+
+
+def get_passing_frame(run_id: str, candidate_id: str) -> Optional[pd.DataFrame]:
+    """Return a candidate table only when that candidate passed the release gate."""
+    frames = _PASSING_FRAMES.get(run_id) or {}
+    frame = frames.get(candidate_id)
+    if frame is None or frame.empty:
+        return None
+    return frame
+
+
+def activate_passing_candidate(run_id: str, candidate_id: str) -> Optional[pd.DataFrame]:
+    """Make a certified candidate the table behind export and BigQuery."""
+    frame = get_passing_frame(run_id, candidate_id)
+    if frame is None:
+        return None
+    with _RUN_LOCK:
+        state = _RUN_STATES.get(run_id)
+        stored = state.get("response") if state else None
+        if isinstance(stored, dict):
+            stored["active_candidate_id"] = candidate_id
+        elif stored is not None and hasattr(stored, "active_candidate_id"):
+            stored.active_candidate_id = candidate_id
+    _RUN_CACHE[run_id] = frame
+    reporter.export_csv(frame, run_id)
+    return frame
 
 
 def _resolve_columns(req: ForgeRequest, meta) -> Dict[str, list]:
@@ -266,14 +295,9 @@ def _auto_heal(
             plan=rescue_plan,
             orchestrator_feedback=detail,
             evaluated_candidates=[
-                CandidateEvaluation(
-                    candidate_index=0,
-                    plan=rescue_plan,
-                    utility=utility,
-                    attack=attack,
-                    passed=passed,
-                    composite_score=score,
-                )
+                orchestrator.score_candidate(
+                    0, rescue_plan, utility, attack, thresholds, max_rounds + attempt,
+                ).model_copy(update={"composite_score": score}),
             ],
             winning_candidate_index=0,
         )
@@ -398,6 +422,8 @@ def run_forge(
     best_failed_synth = None
     best_failed_plan = None
     best_failed_score = float("-inf")
+    passing_frames: Dict[str, pd.DataFrame] = {}
+    released_id = ""
     prior_for_attacker: Optional[dict] = None
     dp_model = None
     if req.synthesis_mode == "dp":
@@ -574,16 +600,12 @@ def run_forge(
             cand_plan = candidates[c_idx]
             cand_util = cand_utils[c_idx]
             cand_attack = cand_attacks[c_idx]
-            cand_passed = orchestrator.decide(cand_util, cand_attack, thresholds)
-            evaluations.append(
-                CandidateEvaluation(
-                    candidate_index=c_idx,
-                    plan=cand_plan,
-                    utility=cand_util,
-                    attack=cand_attack,
-                    passed=cand_passed,
-                )
+            evaluation = orchestrator.score_candidate(
+                c_idx, cand_plan, cand_util, cand_attack, thresholds, i,
             )
+            evaluations.append(evaluation)
+            if evaluation.gate_passed and c_idx < len(candidate_synths):
+                passing_frames[evaluation.candidate_id] = candidate_synths[c_idx].copy()
 
         # Deterministic Pareto candidate selection
         best_idx = orchestrator.select_pareto_candidate(evaluations, thresholds)
@@ -640,6 +662,7 @@ def run_forge(
             best_failed_plan = winning_plan
 
         if passed:
+            released_id = winning_eval.candidate_id
             break
 
         prior_for_attacker = {
@@ -701,9 +724,23 @@ def run_forge(
         rescue_attempts = healed["attempts"]
         for rescued_round in healed["rounds"]:
             blackboard.round_history.append(rescued_round)
+        if passed and healed["rounds"]:
+            rescue_eval = healed["rounds"][-1].evaluated_candidates[0]
+            released_id = rescue_eval.candidate_id
+            passing_frames = {released_id: synth.copy()}
 
     final_status = _certification(passed, rescued=bool(rescue_attempts) and passed)
     status = "SUCCESS" if passed else "FAILED_TO_CONVERGE"
+    frontier = [candidate for rnd in rounds for candidate in rnd.evaluated_candidates]
+    orchestrator.mark_pareto(frontier)
+    if passed and frontier and not released_id:
+        winner = rounds[-1]
+        released_id = f"r{winner.round_index}-c{winner.winning_candidate_index}"
+    with _RUN_LOCK:
+        if passed and passing_frames:
+            _PASSING_FRAMES[run_id] = passing_frames
+        else:
+            _PASSING_FRAMES.pop(run_id, None)
 
     # --- Export + scorecard ---
     export_path = None
@@ -733,6 +770,13 @@ def run_forge(
         pure_dp, dp_model.epsilon_spent if dp_model is not None else 0.0
     )
     scorecard += f"\n\nDIFFERENTIAL PRIVACY: {formal_dp_guarantee}"
+    if frontier:
+        optimal = sum(1 for candidate in frontier if candidate.is_pareto_optimal)
+        certified_count = sum(1 for candidate in frontier if candidate.gate_passed)
+        scorecard += (
+            f"\n\nPARETO FRONTIER: {optimal} of {len(frontier)} candidates are non-dominated. "
+            f"{certified_count} passed the release gate."
+        )
     dual_scorecard = reporter.build_dual_scorecard(rounds, status, thresholds)
 
     response = ForgeResponse(
@@ -753,6 +797,10 @@ def run_forge(
         rescue_attempts=rescue_attempts,
         auto_heal_enabled=req.auto_heal_enabled,
         formal_dp_guarantee=formal_dp_guarantee,
+        active_candidate_id=released_id if passed else "",
+        policy_name=req.policy_name,
+        policy_source=req.policy_source,
+        policy_explanation=req.policy_explanation,
     )
     emit({"type": "done", "response": response.model_dump()})
     return response

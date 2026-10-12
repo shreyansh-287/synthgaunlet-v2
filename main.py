@@ -17,9 +17,10 @@ from __future__ import annotations
 import io
 import json
 import logging
-import queue
-import threading
 import math
+import queue
+import re
+import threading
 from pathlib import Path
 from typing import Any, List, Optional
 
@@ -32,12 +33,21 @@ from starlette.responses import JSONResponse
 
 import llm
 import bigquery_client as bq
+from agents import policy
 from agents.adk_agents import adk_available
 from history_store import HistoryItem, list_history, save_history, clear_history, delete_history_item
 from config import get_settings
 from data_source import get_data_source, list_datasets, register_upload
 from models import ForgeRequest, ForgeResponse, RunStartResponse, RunStatusResponse, SourceSpec, Thresholds
-from pipeline import abort_run, get_run_frame, get_run_status, run_forge, start_run
+from pipeline import (
+    abort_run,
+    activate_passing_candidate,
+    get_passing_frame,
+    get_run_frame,
+    get_run_status,
+    run_forge,
+    start_run,
+)
 
 logger = logging.getLogger("forge.main")
 
@@ -283,6 +293,29 @@ class BQExportRequest(BaseModel):
     project: str = ""
     dataset: str = ""
     table: str
+
+
+class ActiveCandidateRequest(BaseModel):
+    candidate_id: str
+
+
+class PolicyRequest(BaseModel):
+    request: str
+
+
+@app.get("/api/v1/policy/presets")
+def policy_presets():
+    return {"presets": policy.presets_payload()}
+
+
+@app.post("/api/v1/policy/interpret")
+def interpret_policy(body: PolicyRequest):
+    text = body.request.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Describe the policy you want.")
+    if len(text) > 2000:
+        raise HTTPException(status_code=400, detail="Policy description must be at most 2,000 characters.")
+    return policy.interpret(text).model_dump()
 
 
 @app.post("/api/v1/bq/export")
@@ -622,19 +655,47 @@ def forge_stream(
     auto_heal: bool = True,
     synthesis_mode: str = "hybrid",
     dp_epsilon: float = 1.0,
+    fidelity_min: Optional[float] = None,
+    tstr_min: Optional[float] = None,
+    query_equivalence_min: Optional[float] = None,
+    reid_max: Optional[float] = None,
+    membership_max: Optional[float] = None,
+    attribute_inference_max: Optional[float] = None,
+    linkage_max: Optional[float] = None,
+    near_duplicate_max: Optional[float] = None,
+    policy_name: str = "Balanced",
+    policy_source: str = "preset",
+    policy_explanation: str = "",
 ):
     """Server-Sent Events stream of the round-by-round adversarial duel.
 
     Works for both preset datasets (`dataset_key`) and user uploads
     (`upload_id`). For uploads, the UI may pass column-role overrides."""
     settings = get_settings()
-    thresholds = Thresholds(
-        fidelity_min=settings.fidelity_min,
-        tstr_min=settings.tstr_min,
-        query_equivalence_min=settings.query_equivalence_min,
-        reid_max=settings.reid_max,
-        membership_max=settings.membership_max,
-    )
+    threshold_values = {
+        "max_rounds": max_rounds if max_rounds is not None else settings.max_rounds,
+        "fidelity_min": fidelity_min if fidelity_min is not None else settings.fidelity_min,
+        "tstr_min": tstr_min if tstr_min is not None else settings.tstr_min,
+        "query_equivalence_min": (
+            query_equivalence_min
+            if query_equivalence_min is not None
+            else settings.query_equivalence_min
+        ),
+        "reid_max": reid_max if reid_max is not None else settings.reid_max,
+        "membership_max": (
+            membership_max if membership_max is not None else settings.membership_max
+        ),
+    }
+    optional_privacy = {
+        "attribute_inference_max": attribute_inference_max,
+        "linkage_max": linkage_max,
+        "near_duplicate_max": near_duplicate_max,
+    }
+    threshold_values.update({key: value for key, value in optional_privacy.items() if value is not None})
+    try:
+        thresholds = Thresholds(**threshold_values)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid release policy: {exc}")
     if upload_id:
         source = SourceSpec(type="upload", upload_id=upload_id)
     elif dataset_key:
@@ -656,6 +717,9 @@ def forge_stream(
         auto_heal_enabled=auto_heal,
         synthesis_mode=synthesis_mode,
         dp_epsilon=dp_epsilon,
+        policy_name=policy_name[:80],
+        policy_source=policy_source[:30],
+        policy_explanation=policy_explanation[:500],
     )
 
     def event_generator():
@@ -702,11 +766,41 @@ def _uncertified_download_detail(run_id: str) -> Optional[str]:
     )
 
 
-@app.get("/api/v1/export/{run_id}")
-def export(run_id: str, format: str = "csv"):
+_CANDIDATE_ID = re.compile(r"^r\d+-c\d+$")
+
+
+@app.post("/api/v1/forge/{run_id}/active-candidate")
+def set_active_candidate(run_id: str, body: ActiveCandidateRequest):
+    """Point export and BigQuery at another candidate that already passed the gate."""
     blocked = _uncertified_download_detail(run_id)
     if blocked:
         raise HTTPException(status_code=403, detail=blocked)
+    if not _CANDIDATE_ID.fullmatch(body.candidate_id or ""):
+        raise HTTPException(status_code=404, detail="That candidate did not pass the release gate.")
+    frame = activate_passing_candidate(run_id, body.candidate_id)
+    if frame is None:
+        raise HTTPException(status_code=404, detail="That candidate did not pass the release gate.")
+    return {"run_id": run_id, "candidate_id": body.candidate_id, "rows": int(len(frame))}
+
+
+@app.get("/api/v1/export/{run_id}")
+def export(run_id: str, format: str = "csv", candidate_id: Optional[str] = None):
+    blocked = _uncertified_download_detail(run_id)
+    if blocked:
+        raise HTTPException(status_code=403, detail=blocked)
+    if candidate_id:
+        if not _CANDIDATE_ID.fullmatch(candidate_id):
+            raise HTTPException(status_code=404, detail="That candidate did not pass the release gate.")
+        frame = get_passing_frame(run_id, candidate_id)
+        if frame is None:
+            raise HTTPException(status_code=404, detail="That candidate did not pass the release gate.")
+        path = BASE_DIR / "data" / "output" / f"{run_id}_{candidate_id}.csv"
+        frame.to_csv(path, index=False)
+        return FileResponse(
+            path,
+            media_type="text/csv",
+            filename=f"synthetic_{run_id}_{candidate_id}.csv",
+        )
     frame = get_run_frame(run_id)
     if frame is None:
         raise HTTPException(status_code=404, detail=f"Unknown run_id '{run_id}'.")
