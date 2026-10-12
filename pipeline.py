@@ -22,7 +22,7 @@ from sklearn.model_selection import train_test_split
 
 import llm
 import reporter
-from agents import attacker, generator, orchestrator, profiler, statistician
+from agents import attacker, dp_engine, generator, orchestrator, profiler, statistician
 from agents.profiler import profile_dataframe
 from config import get_settings
 from data_source import get_data_source
@@ -354,7 +354,10 @@ def run_forge(
         "sensitive_columns": cols["sensitive_columns"],
         "label_column": cols["label"], "max_rounds": max_rounds,
         "thresholds": thresholds.model_dump(),
-        "auto_heal_enabled": req.auto_heal_enabled, **difficulty,
+        "auto_heal_enabled": req.auto_heal_enabled,
+        "synthesis_mode": req.synthesis_mode,
+        "dp_epsilon": req.dp_epsilon,
+        **difficulty,
     })
 
     # --- Split IN (train/profile) vs OUT (held-out for TSTR + membership) ---
@@ -396,6 +399,32 @@ def run_forge(
     best_failed_plan = None
     best_failed_score = float("-inf")
     prior_for_attacker: Optional[dict] = None
+    dp_model = None
+    if req.synthesis_mode == "dp":
+        emit({
+            "type": "agent", "agent": "generator", "done": False,
+            "message": "Fitting Laplace noisy marginals under the epsilon budget...",
+        })
+        dp_model = dp_engine.fit_marginals(
+            real_train,
+            epsilon_total=req.dp_epsilon,
+            label_column=cols["label"],
+            seed=42,
+        )
+        emit({
+            "type": "dp_budget",
+            "epsilon_total": dp_model.epsilon_total,
+            "epsilon_spent": dp_model.epsilon_spent,
+            "queries": dp_model.query_names,
+            "mechanism": "laplace",
+        })
+        emit({
+            "type": "agent", "agent": "generator", "done": True,
+            "message": (
+                f"Laplace marginals released. Epsilon spent {dp_model.epsilon_spent:.4f} "
+                f"of {dp_model.epsilon_total:.4f}."
+            ),
+        })
 
     for i in range(1, max_rounds + 1):
         if _is_aborted(run_id):
@@ -410,8 +439,13 @@ def run_forge(
             emit({"type": "done", "response": aborted_resp.model_dump()})
             return aborted_resp
 
-        # Generate N candidate plans for this round
-        if i == 1:
+        order = semantic_profile.conditional_generation_order if semantic_profile else None
+
+        # Generate N candidate plans for this round. A pure DP run samples only
+        # from the already released noisy marginals (post-processing).
+        if dp_model is not None:
+            candidates = [dp_engine.release_plan(dp_model)]
+        elif i == 1:
             # Round 1 includes the naive baseline to establish pre-defense duel proof
             candidates = [initial_plan] + generator.generate_candidate_plans(
                 profile, real_train, round_num=1, blackboard=blackboard, business_rules=req.business_rules
@@ -423,23 +457,29 @@ def run_forge(
 
         emit({"type": "round_start", "round": i, "plan": candidates[0].model_dump()})
 
-        order = semantic_profile.conditional_generation_order if semantic_profile else None
-
         # 1. Forge (Generator) synthesizes candidates
         emit({
             "type": "agent", "agent": "generator", "round": i, "done": False,
-            "message": f"Forge is exploring {len(candidates)} candidate plans along the Pareto frontier...",
+            "message": (
+                "Forge is sampling from the Laplace noisy marginals..."
+                if dp_model is not None
+                else f"Forge is exploring {len(candidates)} candidate plans along the Pareto frontier..."
+            ),
         })
 
         candidate_synths: List[pd.DataFrame] = []
-        for c_idx, cand_plan in enumerate(candidates):
-            if _is_aborted(run_id):
-                break
-            cand_synth = generator.synthesize(
-                real_train, cand_plan, n_rows, cols["quasi_identifiers"],
-                label_column=cols["label"], generation_order=order, seed=42 + i * 10 + c_idx,
-            )
-            candidate_synths.append(cand_synth)
+        if dp_model is not None:
+            if not _is_aborted(run_id):
+                candidate_synths.append(dp_engine.sample(dp_model, n_rows, seed=4200 + i))
+        else:
+            for c_idx, cand_plan in enumerate(candidates):
+                if _is_aborted(run_id):
+                    break
+                cand_synth = generator.synthesize(
+                    real_train, cand_plan, n_rows, cols["quasi_identifiers"],
+                    label_column=cols["label"], generation_order=order, seed=42 + i * 10 + c_idx,
+                )
+                candidate_synths.append(cand_synth)
 
         emit({
             "type": "agent", "agent": "generator", "round": i, "done": True,
@@ -688,6 +728,11 @@ def run_forge(
         scorecard += (
             "\n\nAUTO-HEAL: NOT_CERTIFIED. The rescue ladder did not pass the release gate."
         )
+    pure_dp = dp_model is not None and not rescue_attempts
+    formal_dp_guarantee = dp_engine.formal_dp_guarantee_text(
+        pure_dp, dp_model.epsilon_spent if dp_model is not None else 0.0
+    )
+    scorecard += f"\n\nDIFFERENTIAL PRIVACY: {formal_dp_guarantee}"
     dual_scorecard = reporter.build_dual_scorecard(rounds, status, thresholds)
 
     response = ForgeResponse(
@@ -707,6 +752,7 @@ def run_forge(
         final_status=final_status,
         rescue_attempts=rescue_attempts,
         auto_heal_enabled=req.auto_heal_enabled,
+        formal_dp_guarantee=formal_dp_guarantee,
     )
     emit({"type": "done", "response": response.model_dump()})
     return response

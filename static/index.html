@@ -620,6 +620,22 @@
           <span id="sourceTypeBadge" class="px-3 py-1 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10px] font-black uppercase tracking-wider shrink-0 shadow-sm shadow-amber-500/20">Ready</span>
         </div>
 
+        <div class="grid sm:grid-cols-2 gap-3">
+          <div class="space-y-1.5">
+            <label for="synthesisMode" class="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-300">Synthesis engine</label>
+            <select id="synthesisMode" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-semibold outline-none focus:ring-2 ring-indigo-500 text-slate-100">
+              <option value="hybrid" selected>Hybrid marginals</option>
+              <option value="dp">Differential privacy (Laplace)</option>
+            </select>
+          </div>
+          <div id="dpEpsilonWrap" class="hidden space-y-1.5">
+            <label for="dpEpsilon" class="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-300">Epsilon budget</label>
+            <input id="dpEpsilon" type="number" min="0.1" max="20" step="0.1" value="1"
+                   class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-semibold outline-none focus:ring-2 ring-indigo-500 text-slate-100" />
+          </div>
+        </div>
+        <p id="dpModeNote" class="hidden text-[11px] text-slate-400 leading-relaxed">A pure Laplace run reports the epsilon it spent. A hybrid run, including any Auto-Heal rescue, has no formal differential-privacy guarantee. This is technical evidence, not a legal compliance claim.</p>
+
         <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-6 pt-1">
           <div class="space-y-1">
             <h3 class="text-base sm:text-lg font-bold text-slate-100 flex items-center gap-2">
@@ -723,6 +739,11 @@
 
       <!-- Scorecard Section -->
       <section id="scorecardSection" class="hidden space-y-5">
+
+        <div id="dpGuaranteeCard" class="rounded-3xl border border-slate-700 bg-slate-900/90 px-6 py-4">
+          <p class="text-[10px] font-bold uppercase tracking-wider text-sky-300">Differential privacy</p>
+          <p id="dpGuaranteeText" class="mt-1 text-sm font-semibold text-slate-100">No formal DP guarantee</p>
+        </div>
 
         <!-- Unified Metrics Box: both panels side by side -->
         <div class="bg-slate-900/90 rounded-3xl border border-slate-800 shadow-xl overflow-hidden">
@@ -1279,6 +1300,35 @@ async function persistHistoryItem(item){
 }
 function pct(x){ return (x*100).toFixed(1)+'%'; }
 
+function synthesisQuery(){
+  const mode = el('synthesisMode')?.value || 'hybrid';
+  let query = `&synthesis_mode=${encodeURIComponent(mode)}`;
+  if(mode === 'dp'){
+    const epsilon = parseFloat(el('dpEpsilon')?.value);
+    const safe = Number.isFinite(epsilon) && epsilon > 0 ? epsilon : 1;
+    query += `&dp_epsilon=${encodeURIComponent(safe)}`;
+  }
+  return query;
+}
+
+function syncSynthesisMode(){
+  const differential = (el('synthesisMode')?.value || 'hybrid') === 'dp';
+  el('dpEpsilonWrap')?.classList.toggle('hidden', !differential);
+  el('dpModeNote')?.classList.toggle('hidden', !differential);
+}
+
+function showDpGuarantee(resp){
+  const card = el('dpGuaranteeCard');
+  const text = el('dpGuaranteeText');
+  if(!card || !text) return;
+  const guarantee = (resp && resp.formal_dp_guarantee) || 'No formal DP guarantee';
+  text.textContent = guarantee;
+  const formal = guarantee.startsWith('Formal DP guarantee');
+  card.className = formal
+    ? 'rounded-3xl border border-sky-500/40 bg-sky-500/10 px-6 py-4'
+    : 'rounded-3xl border border-slate-700 bg-slate-900/90 px-6 py-4';
+}
+
 function isCertified(resp) {
   if (!resp || resp.status !== 'SUCCESS') return false;
   return !resp.final_status || resp.final_status === 'CERTIFIED' || resp.final_status === 'CERTIFIED_AFTER_RESCUE';
@@ -1746,6 +1796,7 @@ function renderScorecard(resp) {
   }
 
   el('scorecardText').textContent = resp.scorecard_summary || '';
+  showDpGuarantee(resp);
   el('scorecardSection').classList.remove('hidden');
 }
 
@@ -3045,10 +3096,11 @@ function run(){
     const label=el('labelSelect').value;
     url=`/api/v1/forge/stream?upload_id=${encodeURIComponent(state.upload.upload_id)}&n_rows=${nRows}`+
         `&label=${encodeURIComponent(label)}&quasi_identifiers=${encodeURIComponent(qis.join(','))}`+
-        `&sensitive_columns=${encodeURIComponent((state.upload.sensitive_columns||[]).join(','))}`;
+        `&sensitive_columns=${encodeURIComponent((state.upload.sensitive_columns||[]).join(','))}`+
+        synthesisQuery();
   } else {
     if(!state.dataset) return;
-    url=`/api/v1/forge/stream?dataset_key=${encodeURIComponent(state.dataset)}&n_rows=${nRows}`;
+    url=`/api/v1/forge/stream?dataset_key=${encodeURIComponent(state.dataset)}&n_rows=${nRows}`+synthesisQuery();
   }
 
 
@@ -3110,6 +3162,9 @@ function run(){
           addRoundRow(ev.result);
         }
         logLine('orchestrator', ev.message, ev.phase === 'done');
+        break;
+      case 'dp_budget':
+        logLine(null, `Laplace budget spent ${Number(ev.epsilon_spent).toFixed(4)} of ${Number(ev.epsilon_total).toFixed(4)} across ${(ev.queries || []).length} marginal queries.`);
         break;
       case 'rescue_finished':
         if (el('rescueStatus')) el('rescueStatus').textContent = ev.final_status || '';
@@ -3181,6 +3236,7 @@ function finish(resp){
     ? '✅ Converged: proven USEFUL and SAFE.'
     : '🛑 Not certified. This file is not fit to download. ' + releaseFailureReasons(resp).join(' ');
   logLine(null, verdict);
+  if(resp && resp.formal_dp_guarantee) logLine(null, resp.formal_dp_guarantee);
   el('runBtn').disabled = false;
 }
 
@@ -3199,6 +3255,8 @@ function startNewAnalysis(){
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+el('synthesisMode')?.addEventListener('change', syncSynthesisMode);
+syncSynthesisMode();
 el('runBtn').onclick=run;
 el('nRows')?.addEventListener('input', validateForgeReady);
 validateForgeReady();

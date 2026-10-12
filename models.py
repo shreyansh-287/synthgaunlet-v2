@@ -6,7 +6,7 @@ boundary between the deterministic verifiers and the LLM agents.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -245,6 +245,8 @@ class ForgeRequest(BaseModel):
     destination_table_id: Optional[str] = None
     thresholds: Optional[Thresholds] = None
     auto_heal_enabled: bool = True
+    synthesis_mode: Literal["hybrid", "dp"] = "hybrid"
+    dp_epsilon: float = Field(1.0, gt=0, le=20)
 
 
 class ForgeResponse(BaseModel):
@@ -265,6 +267,8 @@ class ForgeResponse(BaseModel):
     final_status: str = ""
     rescue_attempts: List[RescueAttempt] = Field(default_factory=list)
     auto_heal_enabled: bool = False
+    # Exact phrase for hybrid releases. Pure Laplace releases name the spent epsilon.
+    formal_dp_guarantee: str = "No formal DP guarantee"
 
 
 class RunStartResponse(BaseModel):
