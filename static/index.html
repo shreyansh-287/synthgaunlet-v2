@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -636,6 +637,48 @@
         </div>
         <p id="dpModeNote" class="hidden text-[11px] text-slate-400 leading-relaxed">A pure Laplace run reports the epsilon it spent. A hybrid run, including any Auto-Heal rescue, has no formal differential-privacy guarantee. This is technical evidence, not a legal compliance claim.</p>
 
+        <div class="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+            <div>
+              <p class="text-[10px] font-bold uppercase tracking-wider text-violet-300">Release policy</p>
+              <h4 class="mt-1 text-sm font-bold text-slate-100">Choose a preset or describe your priorities</h4>
+              <p class="mt-1 text-[11px] leading-relaxed text-slate-400">The policy changes numeric utility floors and privacy ceilings. Deterministic code still makes every certification decision.</p>
+            </div>
+            <span id="policySourceBadge" class="self-start rounded-full border border-violet-500/30 bg-violet-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-violet-300">Preset</span>
+          </div>
+          <div id="policyPresetGrid" class="grid sm:grid-cols-3 gap-2">
+            <button type="button" data-policy="privacy_first" onclick="selectPolicyPreset('privacy_first')" class="policy-preset rounded-xl border border-slate-700 bg-slate-900 px-3 py-3 text-left transition hover:border-violet-400">
+              <span class="block text-xs font-bold text-slate-100">Privacy first</span>
+              <span class="mt-1 block text-[10px] leading-relaxed text-slate-400">Tighter attack limits and modest utility floors.</span>
+            </button>
+            <button type="button" data-policy="balanced" onclick="selectPolicyPreset('balanced')" class="policy-preset rounded-xl border border-violet-500 bg-violet-500/10 px-3 py-3 text-left transition">
+              <span class="block text-xs font-bold text-slate-100">Balanced</span>
+              <span class="mt-1 block text-[10px] leading-relaxed text-slate-400">Default utility and privacy release gates.</span>
+            </button>
+            <button type="button" data-policy="analytics_first" onclick="selectPolicyPreset('analytics_first')" class="policy-preset rounded-xl border border-slate-700 bg-slate-900 px-3 py-3 text-left transition hover:border-violet-400">
+              <span class="block text-xs font-bold text-slate-100">Analytics first</span>
+              <span class="mt-1 block text-[10px] leading-relaxed text-slate-400">Higher utility floors with explicit privacy ceilings.</span>
+            </button>
+          </div>
+          <div class="flex flex-col sm:flex-row gap-2">
+            <textarea id="policyPrompt" maxlength="2000" rows="2" placeholder="Example: Prioritize privacy and keep re-identification below 0.5%."
+                      class="min-h-[58px] flex-1 resize-y rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-xs text-slate-100 outline-none placeholder:text-slate-500 focus:ring-2 focus:ring-violet-500"></textarea>
+            <button id="interpretPolicyBtn" type="button" onclick="interpretPolicyRequest()"
+                    class="rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-violet-500 disabled:cursor-wait disabled:opacity-50">
+              Interpret policy
+            </button>
+          </div>
+          <div id="activePolicyCard" class="rounded-xl border border-slate-800 bg-slate-900/70 px-3.5 py-3">
+            <div class="flex items-center justify-between gap-3">
+              <p id="activePolicyName" class="text-xs font-bold text-slate-100">Balanced</p>
+              <button type="button" onclick="togglePolicyDetails()" class="text-[10px] font-bold text-violet-300 hover:text-violet-200">View thresholds</button>
+            </div>
+            <p id="activePolicyExplanation" class="mt-1 text-[10px] leading-relaxed text-slate-400">The default balance of analytical usefulness and attack resistance.</p>
+            <div id="policyThresholdDetails" class="hidden mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px]"></div>
+          </div>
+          <p class="text-[10px] leading-relaxed text-slate-500">Natural-language interpretation receives only your policy text—never source rows. These presets are technical controls and do not certify HIPAA, GDPR, or other legal compliance.</p>
+        </div>
+
         <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-6 pt-1">
           <div class="space-y-1">
             <h3 class="text-base sm:text-lg font-bold text-slate-100 flex items-center gap-2">
@@ -746,6 +789,36 @@
         <div id="dpGuaranteeCard" class="rounded-3xl border border-slate-700 bg-slate-900/90 px-6 py-4">
           <p class="text-[10px] font-bold uppercase tracking-wider text-sky-300">Differential privacy</p>
           <p id="dpGuaranteeText" class="mt-1 text-sm font-semibold text-slate-100">No formal DP guarantee</p>
+          <p id="dpGuaranteeDescription" class="mt-2 max-w-4xl text-[11px] leading-relaxed text-slate-400">This run used the hybrid synthesis path. It is still evaluated by every deterministic utility and privacy attack gate, but it does not carry a mathematical differential-privacy epsilon guarantee.</p>
+        </div>
+
+        <div id="runPolicyCard" class="rounded-3xl border border-violet-500/25 bg-violet-500/5 px-6 py-4">
+          <p class="text-[10px] font-bold uppercase tracking-wider text-violet-300">Release policy applied</p>
+          <div class="mt-1 flex flex-wrap items-center gap-2">
+            <p id="runPolicyName" class="text-sm font-semibold text-slate-100">Balanced</p>
+            <span id="runPolicySource" class="rounded-full border border-slate-700 px-2 py-0.5 text-[9px] font-bold uppercase text-slate-400">Preset</span>
+          </div>
+          <p id="runPolicyDescription" class="mt-2 text-[11px] leading-relaxed text-slate-400"></p>
+        </div>
+
+        <div id="paretoSection" class="relative hidden bg-slate-900/90 rounded-3xl border border-slate-800 shadow-xl p-6 space-y-4">
+          <div>
+            <h4 class="text-sm font-bold text-slate-100">Privacy–utility frontier</h4>
+            <p class="mt-1 text-xs text-slate-400 leading-relaxed">Every candidate from this run. The line connects the Pareto frontier. The shaded region is past the privacy ceiling or below the utility floor. Point color is the release gate.</p>
+          </div>
+          <div class="relative h-80 sm:h-96">
+            <canvas id="paretoChart"></canvas>
+            <div id="paretoTooltip" class="pointer-events-none absolute z-20 hidden min-w-48 max-w-64 rounded-xl border border-slate-600 bg-slate-950/95 px-3 py-2.5 text-xs shadow-2xl backdrop-blur"></div>
+          </div>
+          <div id="paretoSliderWrap" class="space-y-2">
+            <div class="flex justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              <span>Max privacy</span>
+              <span>Max utility</span>
+            </div>
+            <input id="paretoSlider" type="range" min="0" max="0" step="1" value="0" class="w-full cursor-pointer accent-indigo-400 disabled:cursor-not-allowed disabled:opacity-40" />
+            <p id="paretoSliderLabel" class="text-xs text-slate-300"></p>
+          </div>
+          <p id="paretoEmpty" class="hidden text-xs text-slate-400">No certified candidate is available to trade off.</p>
         </div>
 
         <!-- Unified Metrics Box: both panels side by side -->
@@ -1197,9 +1270,26 @@
   </div>
 
 <script>
+const POLICY_PRESETS = {
+  balanced: {
+    name: 'Balanced',
+    explanation: 'The default balance of analytical usefulness and attack resistance.',
+    thresholds: {max_rounds:5, fidelity_min:0.82, tstr_min:0.85, query_equivalence_min:0.95, reid_max:0.01, membership_max:0.60, attribute_inference_max:0.25, linkage_max:0.15, near_duplicate_max:0.10}
+  },
+  privacy_first: {
+    name: 'Privacy first',
+    explanation: 'Tighter privacy ceilings with modestly relaxed utility floors.',
+    thresholds: {max_rounds:5, fidelity_min:0.80, tstr_min:0.82, query_equivalence_min:0.92, reid_max:0.005, membership_max:0.55, attribute_inference_max:0.15, linkage_max:0.08, near_duplicate_max:0.05}
+  },
+  analytics_first: {
+    name: 'Analytics first',
+    explanation: 'Higher utility floors while retaining explicit privacy release ceilings.',
+    thresholds: {max_rounds:5, fidelity_min:0.90, tstr_min:0.90, query_equivalence_min:0.97, reid_max:0.015, membership_max:0.62, attribute_inference_max:0.28, linkage_max:0.18, near_duplicate_max:0.12}
+  }
+};
 const state = { mode: null, dataset: null, upload: null, runId: null,
-                thresholds: {reid_max:0.01, membership_max:0.60, fidelity_min:0.82,
-                  tstr_min:0.85, query_equivalence_min:0.95} };
+                thresholds: {...POLICY_PRESETS.balanced.thresholds},
+                policy: {...POLICY_PRESETS.balanced, id:'balanced', source:'preset'} };
 
 const AGENTS = {
   generator:    { name: 'Forge',      role: 'Synthesizer',      emoji: '⚗️',  color: 'indigo' },
@@ -1311,6 +1401,7 @@ async function persistHistoryItem(item){
   }
 }
 function pct(x){ return (x*100).toFixed(1)+'%'; }
+let paretoView = null;
 
 function synthesisQuery(){
   const mode = el('synthesisMode')?.value || 'hybrid';
@@ -1320,7 +1411,88 @@ function synthesisQuery(){
     const safe = Number.isFinite(epsilon) && epsilon > 0 ? epsilon : 1;
     query += `&dp_epsilon=${encodeURIComponent(safe)}`;
   }
+  const policy = state.policy || {...POLICY_PRESETS.balanced, source:'preset'};
+  const thresholds = policy.thresholds || POLICY_PRESETS.balanced.thresholds;
+  Object.entries(thresholds).forEach(([key, value]) => {
+    query += `&${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
+  });
+  query += `&policy_name=${encodeURIComponent(policy.name || 'Balanced')}`;
+  query += `&policy_source=${encodeURIComponent(policy.source || 'preset')}`;
+  query += `&policy_explanation=${encodeURIComponent(policy.explanation || '')}`;
   return query;
+}
+
+function policyThresholdHtml(thresholds){
+  const labels = {
+    fidelity_min:'Fidelity ≥', tstr_min:'TSTR ≥', query_equivalence_min:'Queries ≥',
+    reid_max:'Re-ID ≤', membership_max:'Membership ≤', attribute_inference_max:'Attribute ≤',
+    linkage_max:'Linkage ≤', near_duplicate_max:'Near duplicate ≤'
+  };
+  return Object.entries(labels).map(([key, label]) => `
+    <div class="rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-2">
+      <span class="block text-slate-500">${label}</span>
+      <span class="mt-0.5 block font-bold text-slate-200">${pct(Number(thresholds[key] ?? 0))}</span>
+    </div>`).join('');
+}
+
+function renderActivePolicy(){
+  const policy = state.policy || {...POLICY_PRESETS.balanced, source:'preset'};
+  if(el('activePolicyName')) el('activePolicyName').textContent = policy.name;
+  if(el('activePolicyExplanation')) el('activePolicyExplanation').textContent = policy.explanation;
+  if(el('policySourceBadge')) el('policySourceBadge').textContent = policy.source === 'gemini' ? 'Gemini interpreted' : policy.source === 'deterministic' ? 'Locally interpreted' : 'Preset';
+  if(el('policyThresholdDetails')) el('policyThresholdDetails').innerHTML = policyThresholdHtml(policy.thresholds);
+  document.querySelectorAll('.policy-preset').forEach(button => {
+    const active = button.dataset.policy === policy.id;
+    button.className = active
+      ? 'policy-preset rounded-xl border border-violet-500 bg-violet-500/10 px-3 py-3 text-left transition'
+      : 'policy-preset rounded-xl border border-slate-700 bg-slate-900 px-3 py-3 text-left transition hover:border-violet-400';
+  });
+}
+
+function selectPolicyPreset(id){
+  const preset = POLICY_PRESETS[id] || POLICY_PRESETS.balanced;
+  state.policy = {id, name:preset.name, explanation:preset.explanation, thresholds:{...preset.thresholds}, source:'preset'};
+  state.thresholds = {...preset.thresholds};
+  renderActivePolicy();
+}
+
+function togglePolicyDetails(){
+  el('policyThresholdDetails')?.classList.toggle('hidden');
+}
+
+async function interpretPolicyRequest(){
+  const request = el('policyPrompt')?.value.trim();
+  if(!request){
+    el('policyPrompt')?.focus();
+    return;
+  }
+  const button = el('interpretPolicyBtn');
+  const original = button.textContent;
+  button.disabled = true;
+  button.textContent = 'Interpreting…';
+  try {
+    const response = await fetch('/api/v1/policy/interpret', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({request})
+    });
+    const payload = await response.json();
+    if(!response.ok) throw new Error(payload.detail || 'Policy interpretation failed.');
+    state.policy = {
+      id:'custom',
+      name:payload.policy_name || 'Custom policy',
+      explanation:payload.explanation || 'Custom release thresholds.',
+      thresholds:payload.thresholds,
+      source:payload.source || 'deterministic'
+    };
+    state.thresholds = {...payload.thresholds};
+    renderActivePolicy();
+  } catch(error) {
+    alert(error.message || 'Could not interpret that policy.');
+  } finally {
+    button.disabled = false;
+    button.textContent = original;
+  }
 }
 
 function syncSynthesisMode(){
@@ -1332,10 +1504,16 @@ function syncSynthesisMode(){
 function showDpGuarantee(resp){
   const card = el('dpGuaranteeCard');
   const text = el('dpGuaranteeText');
+  const description = el('dpGuaranteeDescription');
   if(!card || !text) return;
   const guarantee = (resp && resp.formal_dp_guarantee) || 'No formal DP guarantee';
   text.textContent = guarantee;
   const formal = guarantee.startsWith('Formal DP guarantee');
+  if(description) {
+    description.textContent = formal
+      ? 'This table was sampled only from Laplace-noised marginals under the displayed epsilon budget. Repeated sampling is post-processing and does not spend additional epsilon.'
+      : 'This run used the hybrid synthesis path, or Auto-Heal replaced a DP table. It is still evaluated by every deterministic utility and privacy attack gate, but it does not carry a mathematical differential-privacy epsilon guarantee.';
+  }
   card.className = formal
     ? 'rounded-3xl border border-sky-500/40 bg-sky-500/10 px-6 py-4'
     : 'rounded-3xl border border-slate-700 bg-slate-900/90 px-6 py-4';
@@ -1776,8 +1954,24 @@ function renderScorecard(resp) {
     const u = finalRound.utility;
     const a = finalRound.attack;
     const t = resp.thresholds || state.thresholds;
+    fillMetricCards(u, a, t);
+    renderFairness(finalRound.utility && finalRound.utility.fairness);
+  } else {
+    renderFairness(null);
+  }
 
-    el('usefulCards').innerHTML = `
+  el('scorecardText').textContent = resp.scorecard_summary || '';
+  showDpGuarantee(resp);
+  if(el('runPolicyName')) el('runPolicyName').textContent = resp.policy_name || 'Balanced';
+  if(el('runPolicySource')) el('runPolicySource').textContent = resp.policy_source === 'gemini' ? 'Gemini interpreted' : resp.policy_source === 'deterministic' ? 'Locally interpreted' : 'Preset';
+  if(el('runPolicyDescription')) el('runPolicyDescription').textContent = resp.policy_explanation || 'The run used the displayed deterministic release thresholds.';
+  el('scorecardSection').classList.remove('hidden');
+  renderPareto(resp);
+}
+
+function fillMetricCards(u, a, t) {
+  if (!u || !a) return;
+  el('usefulCards').innerHTML = `
       <div class="p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
         <div>
           <div class="text-[11px] sm:text-xs text-slate-400 font-bold">Distribution Fidelity</div>
@@ -1839,14 +2033,337 @@ function renderScorecard(resp) {
       ${privacyCard('Auxiliary linkage', a.linkage_rate || 0, t.linkage_max ?? 0.15)}
       ${privacyCard('Near-duplicate rows', a.near_duplicate_rate || 0, t.near_duplicate_max ?? 0.10)}
     `;
-    renderFairness(finalRound.utility && finalRound.utility.fairness);
-  } else {
-    renderFairness(null);
+}
+
+function collectParetoPoints(resp) {
+  const points = [];
+  (resp.rounds || []).forEach(round => {
+    (round.evaluated_candidates || []).forEach(candidate => {
+      const utility = candidate.utility || {};
+      const attack = candidate.attack || {};
+      const utilityScore = Number.isFinite(candidate.utility_score)
+        ? candidate.utility_score
+        : ((Number(utility.fidelity_score) || 0) + (Number(utility.query_equivalence) || 0) + (Number(utility.utility_ratio) || 0)) / 3;
+      points.push({
+        candidate_id: candidate.candidate_id || `r${round.round_index}-c${candidate.candidate_index}`,
+        round_index: round.round_index,
+        candidate_index: candidate.candidate_index,
+        plan_name: (candidate.plan && candidate.plan.plan_name) || `candidate ${candidate.candidate_index}`,
+        utility_score: utilityScore,
+        privacy_risk: Number.isFinite(candidate.privacy_risk) ? candidate.privacy_risk : 0,
+        is_pareto_optimal: !!candidate.is_pareto_optimal,
+        gate_passed: !!candidate.gate_passed,
+        utility,
+        attack,
+      });
+    });
+  });
+  return points;
+}
+
+function orderTradeoffCandidates(candidates) {
+  if (candidates.length < 2) return candidates.slice();
+  let privateEnd = candidates[0];
+  let usefulEnd = candidates[0];
+  candidates.forEach(point => {
+    const morePrivate = point.privacy_risk < privateEnd.privacy_risk - 1e-9
+      || (Math.abs(point.privacy_risk - privateEnd.privacy_risk) <= 1e-9 && point.utility_score < privateEnd.utility_score);
+    const moreUseful = point.utility_score > usefulEnd.utility_score + 1e-9
+      || (Math.abs(point.utility_score - usefulEnd.utility_score) <= 1e-9 && point.privacy_risk > usefulEnd.privacy_risk);
+    if (morePrivate) privateEnd = point;
+    if (moreUseful) usefulEnd = point;
+  });
+  const dx = usefulEnd.privacy_risk - privateEnd.privacy_risk;
+  const dy = usefulEnd.utility_score - privateEnd.utility_score;
+  const project = point => (
+    (point.privacy_risk - privateEnd.privacy_risk) * dx
+    + (point.utility_score - privateEnd.utility_score) * dy
+  );
+  return candidates.slice().sort((a, b) => project(a) - project(b));
+}
+
+function paretoLabel(point) {
+  const frontier = point.is_pareto_optimal ? ' Pareto optimal.' : '';
+  const certifiedRun = paretoView && isCertified(paretoView.resp);
+  const handoff = !certifiedRun
+    ? ' This run is not certified, so the file stays unavailable.'
+    : point.gate_passed
+      ? ' This certified table is the current download.'
+      : ' This candidate failed the release gate, so the download stays on the certified table.';
+  return `Round ${point.round_index} · ${point.plan_name}. Utility ${pct(point.utility_score)}. Privacy risk ${point.privacy_risk.toFixed(2)}.${frontier}${handoff}`;
+}
+
+function destroyParetoChart() {
+  if (paretoView && paretoView.chart) {
+    paretoView.chart.destroy();
+    paretoView.chart = null;
+  }
+}
+
+async function activateCandidate(runId, candidateId) {
+  try {
+    await fetch(`/api/v1/forge/${encodeURIComponent(runId)}/active-candidate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ candidate_id: candidateId }),
+    });
+  } catch (err) {
+    console.warn('Could not switch the active certified table', err);
+  }
+}
+
+function selectParetoIndex(index, notifyServer) {
+  if (!paretoView || !paretoView.ordered.length) return;
+  const point = paretoView.ordered[Math.max(0, Math.min(paretoView.ordered.length - 1, index))];
+  paretoView.activeId = point.candidate_id;
+  const label = el('paretoSliderLabel');
+  if (label) label.textContent = paretoLabel(point);
+  const t = paretoView.resp.thresholds || state.thresholds;
+  fillMetricCards(point.utility, point.attack, t);
+  renderFairness(point.utility && point.utility.fairness);
+  if (typeof updateMetrics === 'function') updateMetrics(point.utility, point.attack);
+  const download = el('topDownloadBtn');
+  if (isCertified(paretoView.resp) && point.gate_passed) {
+    paretoView.downloadId = point.candidate_id;
+    if (download) {
+      download.href = `/api/v1/export/${paretoView.resp.run_id}?format=csv&candidate_id=${encodeURIComponent(point.candidate_id)}`;
+    }
+    if (notifyServer) activateCandidate(paretoView.resp.run_id, point.candidate_id);
+  } else if (isCertified(paretoView.resp) && download && paretoView.downloadId) {
+    download.href = `/api/v1/export/${paretoView.resp.run_id}?format=csv&candidate_id=${encodeURIComponent(paretoView.downloadId)}`;
+  }
+  if (paretoView.chart) paretoView.chart.update('none');
+}
+
+function renderPareto(resp) {
+  const section = el('paretoSection');
+  if (!section) return;
+  destroyParetoChart();
+  const points = collectParetoPoints(resp);
+  if (!points.length) {
+    section.classList.add('hidden');
+    paretoView = null;
+    return;
+  }
+  section.classList.remove('hidden');
+  const ordered = orderTradeoffCandidates(points);
+  const passing = ordered.filter(point => point.gate_passed);
+  const certified = isCertified(resp);
+  const sliderWrap = el('paretoSliderWrap');
+  const empty = el('paretoEmpty');
+  const slider = el('paretoSlider');
+  const showSlider = ordered.length > 0;
+  if (sliderWrap) sliderWrap.classList.toggle('hidden', !showSlider);
+  if (empty) empty.classList.toggle('hidden', showSlider);
+  const downloadId = passing.some(point => point.candidate_id === resp.active_candidate_id)
+    ? resp.active_candidate_id
+    : (passing[0] ? passing[0].candidate_id : '');
+  paretoView = { resp, points, ordered, passing, chart: null, activeId: resp.active_candidate_id || '', downloadId };
+
+  if (showSlider && slider) {
+    slider.min = '0';
+    slider.max = String(Math.max(0, ordered.length - 1));
+    slider.disabled = ordered.length < 2;
+    const activeIndex = Math.max(0, ordered.findIndex(point => point.candidate_id === (resp.active_candidate_id || downloadId)));
+    slider.value = String(activeIndex);
+    slider.oninput = () => selectParetoIndex(Number(slider.value), false);
+    slider.onchange = () => selectParetoIndex(Number(slider.value), true);
+    selectParetoIndex(activeIndex, false);
   }
 
-  el('scorecardText').textContent = resp.scorecard_summary || '';
-  showDpGuarantee(resp);
-  el('scorecardSection').classList.remove('hidden');
+  const canvas = el('paretoChart');
+  if (!canvas || typeof Chart === 'undefined') return;
+  const thresholds = resp.thresholds || state.thresholds || {};
+  const utilityGateAverage = (
+    Number(thresholds.fidelity_min ?? 0.82)
+    + Number(thresholds.tstr_min ?? 0.85)
+    + Number(thresholds.query_equivalence_min ?? 0.95)
+  ) / 3;
+  const plotRisk = value => Math.log1p(Math.max(0, Number(value) || 0));
+  const xy = point => ({
+    x: plotRisk(point.privacy_risk),
+    y: point.utility_score,
+    point,
+  });
+  const radius = ctx => {
+    const raw = ctx.raw;
+    if (!raw || !raw.point) return 5;
+    return raw.point.candidate_id === paretoView.activeId ? 8 : 5;
+  };
+  const zonePlugin = {
+    id: 'gateZone',
+    beforeDraw(chart) {
+      const { ctx, chartArea, scales } = chart;
+      if (!chartArea || !scales.x || !scales.y) return;
+      const xCeiling = scales.x.getPixelForValue(plotRisk(1));
+      const yFloor = scales.y.getPixelForValue(utilityGateAverage);
+      ctx.save();
+      ctx.fillStyle = 'rgba(244, 63, 94, 0.09)';
+      if (xCeiling < chartArea.right) {
+        ctx.fillRect(Math.max(xCeiling, chartArea.left), chartArea.top, chartArea.right - Math.max(xCeiling, chartArea.left), chartArea.bottom - chartArea.top);
+      }
+      if (yFloor < chartArea.bottom) {
+        ctx.fillRect(chartArea.left, yFloor, chartArea.right - chartArea.left, chartArea.bottom - yFloor);
+      }
+      ctx.strokeStyle = 'rgba(251, 113, 133, 0.85)';
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(xCeiling, chartArea.top);
+      ctx.lineTo(xCeiling, chartArea.bottom);
+      ctx.moveTo(chartArea.left, yFloor);
+      ctx.lineTo(chartArea.right, yFloor);
+      ctx.stroke();
+      ctx.restore();
+    },
+  };
+  const chartBackgroundPlugin = {
+    id: 'chartBackground',
+    beforeDraw(chart) {
+      const {ctx, chartArea} = chart;
+      if(!chartArea) return;
+      const gradient = ctx.createLinearGradient(chartArea.left, chartArea.top, chartArea.right, chartArea.bottom);
+      gradient.addColorStop(0, 'rgba(30, 41, 59, 0.62)');
+      gradient.addColorStop(1, 'rgba(15, 23, 42, 0.92)');
+      ctx.save();
+      ctx.fillStyle = gradient;
+      ctx.fillRect(chartArea.left, chartArea.top, chartArea.right-chartArea.left, chartArea.bottom-chartArea.top);
+      ctx.restore();
+    }
+  };
+  const frontier = points.filter(point => point.is_pareto_optimal)
+    .sort((a, b) => a.privacy_risk - b.privacy_risk || b.utility_score - a.utility_score);
+  const failed = points.filter(point => !point.gate_passed && !point.is_pareto_optimal);
+  const passedOff = points.filter(point => point.gate_passed && !point.is_pareto_optimal);
+  const tick = '#94a3b8';
+  const risks = points.map(point => Math.max(0, Number(point.privacy_risk) || 0));
+  const utilities = points.map(point => Math.max(0, Math.min(1, Number(point.utility_score) || 0)));
+  const maxRisk = Math.max(1, ...risks);
+  const xMax = plotRisk(maxRisk <= 1.2 ? 1.2 : maxRisk * 1.08);
+  const utilityMin = Math.min(utilityGateAverage, ...utilities);
+  const utilityMax = Math.max(utilityGateAverage, ...utilities);
+  let yMin = Math.max(0, utilityMin - Math.max(0.035, (utilityMax - utilityMin) * 0.18));
+  let yMax = Math.min(1, utilityMax + Math.max(0.035, (utilityMax - utilityMin) * 0.18));
+  if(yMax - yMin < 0.12){
+    const midpoint = (yMax + yMin) / 2;
+    yMin = Math.max(0, midpoint - 0.06);
+    yMax = Math.min(1, midpoint + 0.06);
+  }
+  const externalTooltip = context => {
+    const tooltip = context.tooltip;
+    const node = el('paretoTooltip');
+    if(!node) return;
+    if(tooltip.opacity === 0 || !tooltip.dataPoints?.length){
+      node.classList.add('hidden');
+      return;
+    }
+    const point = tooltip.dataPoints[0].raw.point;
+    const gateClass = point.gate_passed ? 'text-emerald-300' : 'text-rose-300';
+    node.innerHTML = `
+      <div class="flex items-center justify-between gap-3">
+        <span class="font-bold text-slate-100">${escapeHtml(point.plan_name)}</span>
+        <span class="${gateClass} text-[10px] font-bold uppercase">${point.gate_passed ? 'Gate passed' : 'Gate failed'}</span>
+      </div>
+      <div class="mt-2 grid grid-cols-2 gap-2">
+        <div class="rounded-lg bg-slate-900 px-2 py-1.5"><span class="block text-[9px] uppercase text-slate-500">Utility</span><strong class="text-indigo-200">${pct(point.utility_score)}</strong></div>
+        <div class="rounded-lg bg-slate-900 px-2 py-1.5"><span class="block text-[9px] uppercase text-slate-500">Privacy risk</span><strong class="text-sky-200">${point.privacy_risk.toFixed(2)}</strong></div>
+      </div>
+      <p class="mt-2 text-[10px] text-slate-400">Round ${point.round_index}${point.is_pareto_optimal ? ' · Pareto optimal' : ''}</p>`;
+    node.classList.remove('hidden');
+    const parent = node.parentElement.getBoundingClientRect();
+    const canvasBox = context.chart.canvas.getBoundingClientRect();
+    const width = node.offsetWidth;
+    const height = node.offsetHeight;
+    const desiredLeft = canvasBox.left - parent.left + tooltip.caretX + 14;
+    const desiredTop = canvasBox.top - parent.top + tooltip.caretY - height / 2;
+    node.style.left = `${Math.max(6, Math.min(parent.width - width - 6, desiredLeft))}px`;
+    node.style.top = `${Math.max(6, Math.min(parent.height - height - 6, desiredTop))}px`;
+  };
+  paretoView.chart = new Chart(canvas, {
+    type: 'scatter',
+    data: {
+      datasets: [
+        {
+          label: 'Failed the gate',
+          data: failed.map(xy),
+          backgroundColor: '#fb7185',
+          pointRadius: radius,
+          pointHoverRadius: 9,
+          pointBorderColor: '#fecdd3',
+          pointBorderWidth: 1.5,
+        },
+        {
+          label: 'Passed the gate',
+          data: passedOff.map(xy),
+          backgroundColor: '#34d399',
+          pointRadius: radius,
+          pointHoverRadius: 9,
+          pointBorderColor: '#a7f3d0',
+          pointBorderWidth: 1.5,
+        },
+        {
+          label: 'Pareto frontier',
+          data: frontier.map(xy),
+          showLine: true,
+          fill: false,
+          borderColor: '#818cf8',
+          backgroundColor: '#818cf8',
+          pointBackgroundColor: frontier.map(point => point.gate_passed ? '#34d399' : '#fb7185'),
+          pointRadius: radius,
+          pointHoverRadius: 10,
+          pointBorderColor: '#c7d2fe',
+          pointBorderWidth: 2,
+          borderWidth: 2,
+          tension: 0.22,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: {duration:450, easing:'easeOutQuart'},
+      plugins: {
+        legend: { labels: { color: tick, boxWidth: 10 } },
+        tooltip: { enabled:false, external:externalTooltip },
+      },
+      interaction: {mode:'nearest', intersect:true},
+      layout: {padding:{top:8, right:10, bottom:4, left:4}},
+      scales: {
+        x: {
+          min: 0,
+          max: xMax,
+          title: { display: true, text: 'Privacy risk · logarithmic scale (1 = ceiling)', color: tick },
+          ticks: {
+            color: tick,
+            maxTicksLimit:7,
+            callback:value => {
+              const risk = Math.expm1(Number(value));
+              return risk < 2 ? risk.toFixed(1) : risk.toFixed(0);
+            }
+          },
+          grid: { color: 'rgba(148, 163, 184, 0.12)' },
+          border: {color:'rgba(148, 163, 184, 0.35)'}
+        },
+        y: {
+          min: yMin,
+          max: yMax,
+          title: { display: true, text: 'Utility', color: tick },
+          ticks: { color: tick, maxTicksLimit:6, callback:value => `${Math.round(Number(value)*100)}%` },
+          grid: { color: 'rgba(148, 163, 184, 0.12)' },
+          border: {color:'rgba(148, 163, 184, 0.35)'}
+        },
+      },
+      onClick(evt, elements, chart) {
+        if (!elements.length || !certified) return;
+        const raw = chart.data.datasets[elements[0].datasetIndex].data[elements[0].index];
+        if (!raw || !raw.point) return;
+        const index = paretoView.ordered.findIndex(point => point.candidate_id === raw.point.candidate_id);
+        if (index < 0) return;
+        if (slider) slider.value = String(index);
+        selectParetoIndex(index, true);
+      },
+    },
+    plugins: [chartBackgroundPlugin, zonePlugin],
+  });
 }
 
 async function loadDatasets(){
@@ -3335,6 +3852,8 @@ function finish(resp){
 }
 
 function startNewAnalysis(){
+  destroyParetoChart();
+  paretoView = null;
   // Hide all result sections
   ['castSection','metricsSection','liveSection','scorecardSection','difficultyBanner','rescueSection'].forEach(id => {
     const s = el(id); if(s){ s.classList.add('hidden'); }
@@ -3351,6 +3870,7 @@ function startNewAnalysis(){
 
 el('synthesisMode')?.addEventListener('change', syncSynthesisMode);
 syncSynthesisMode();
+renderActivePolicy();
 el('runBtn').onclick=run;
 el('nRows')?.addEventListener('input', validateForgeReady);
 validateForgeReady();

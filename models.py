@@ -192,6 +192,14 @@ class CandidateEvaluation(BaseModel):
     attack: PrivacyAttackResults
     passed: bool
     composite_score: float = 0.0
+    # r{round}-c{index}. Empty on objects built before a forge round assigned one.
+    candidate_id: str = ""
+    # Mean of fidelity, query equivalence, and TSTR.
+    utility_score: float = 0.0
+    # Worst of re-id, membership, attribute inference, and linkage, scaled to the gate.
+    privacy_risk: float = 0.0
+    is_pareto_optimal: bool = False
+    gate_passed: bool = False
 
 
 class RoundResult(BaseModel):
@@ -275,6 +283,9 @@ class ForgeRequest(BaseModel):
     auto_heal_enabled: bool = True
     synthesis_mode: Literal["hybrid", "dp"] = "hybrid"
     dp_epsilon: float = Field(1.0, gt=0, le=20)
+    policy_name: str = "Balanced"
+    policy_source: str = "preset"
+    policy_explanation: str = ""
 
 
 class ForgeResponse(BaseModel):
@@ -297,6 +308,11 @@ class ForgeResponse(BaseModel):
     auto_heal_enabled: bool = False
     # Exact phrase for hybrid releases. Pure Laplace releases name the spent epsilon.
     formal_dp_guarantee: str = "No formal DP guarantee"
+    # Certified table the download serves until the trade-off slider moves.
+    active_candidate_id: str = ""
+    policy_name: str = "Balanced"
+    policy_source: str = "preset"
+    policy_explanation: str = ""
 
 
 class RunStartResponse(BaseModel):

@@ -131,6 +131,91 @@ def build_rescue_plan(
     })
 
 
+def utility_score(utility: UtilityResult) -> float:
+    """Mean of fidelity, query equivalence, and train-on-synthetic utility."""
+    return round(
+        (
+            float(utility.fidelity_score)
+            + float(utility.query_equivalence)
+            + float(utility.utility_ratio)
+        ) / 3.0,
+        6,
+    )
+
+
+def _risk_ratio(value: float, limit: float) -> float:
+    if limit <= 0:
+        return 0.0 if value <= 0 else 10.0
+    return max(0.0, float(value) / float(limit))
+
+
+def privacy_risk(attack: AttackResult, t: Thresholds) -> float:
+    """Worst normalized privacy signal. 1.0 sits on the release ceiling.
+
+    Re-identification, attribute inference, and linkage are value/limit.
+    Membership is the excess over a 0.5 chance baseline, divided by the
+    gap from 0.5 up to the membership ceiling. Near-duplicate stays on the
+    release gate and is not part of this axis.
+    """
+    span = float(t.membership_max) - 0.5
+    if span <= 0:
+        membership = 0.0 if float(attack.membership_accuracy) <= float(t.membership_max) else 10.0
+    else:
+        membership = max(0.0, float(attack.membership_accuracy) - 0.5) / span
+    return round(max(
+        _risk_ratio(attack.re_id_rate, t.reid_max),
+        membership,
+        _risk_ratio(attack.attribute_inference_advantage, t.attribute_inference_max),
+        _risk_ratio(attack.linkage_rate, t.linkage_max),
+    ), 6)
+
+
+def score_candidate(
+    candidate_index: int,
+    plan: GenerationPlan,
+    utility: UtilityResult,
+    attack: AttackResult,
+    t: Thresholds,
+    round_index: int,
+) -> CandidateEvaluation:
+    """Attach utility, privacy risk, and the release-gate flag. Frontier comes later."""
+    passed = decide(utility, attack, t)
+    return CandidateEvaluation(
+        candidate_index=candidate_index,
+        candidate_id=f"r{round_index}-c{candidate_index}",
+        plan=plan,
+        utility=utility,
+        attack=attack,
+        passed=passed,
+        gate_passed=passed,
+        utility_score=utility_score(utility),
+        privacy_risk=privacy_risk(attack, t),
+    )
+
+
+def mark_pareto(evaluations: List[CandidateEvaluation]) -> None:
+    """Flag the 2D skyline. A dominates B when utility is at least as high and
+    privacy risk is at most as high, with at least one of those strict.
+    """
+    for candidate in evaluations:
+        dominated = False
+        for other in evaluations:
+            if other is candidate:
+                continue
+            as_good = (
+                other.utility_score >= candidate.utility_score - 1e-9
+                and other.privacy_risk <= candidate.privacy_risk + 1e-9
+            )
+            strictly_better = (
+                other.utility_score > candidate.utility_score + 1e-9
+                or other.privacy_risk < candidate.privacy_risk - 1e-9
+            )
+            if as_good and strictly_better:
+                dominated = True
+                break
+        candidate.is_pareto_optimal = not dominated
+
+
 def select_pareto_candidate(
     evaluations: List[CandidateEvaluation],
     t: Thresholds,
