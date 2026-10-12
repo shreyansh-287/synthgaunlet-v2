@@ -620,6 +620,8 @@ def forge_stream(
     quasi_identifiers: Optional[str] = None,
     sensitive_columns: Optional[str] = None,
     auto_heal: bool = True,
+    synthesis_mode: str = "hybrid",
+    dp_epsilon: float = 1.0,
 ):
     """Server-Sent Events stream of the round-by-round adversarial duel.
 
@@ -639,6 +641,10 @@ def forge_stream(
         source = SourceSpec(type="csv", dataset_key=dataset_key)
     else:
         raise HTTPException(status_code=400, detail="Provide dataset_key or upload_id.")
+    if synthesis_mode not in {"hybrid", "dp"}:
+        raise HTTPException(status_code=400, detail="synthesis_mode must be hybrid or dp.")
+    if dp_epsilon <= 0 or dp_epsilon > 20:
+        raise HTTPException(status_code=400, detail="dp_epsilon must be greater than 0 and at most 20.")
 
     req = ForgeRequest(
         source=source,
@@ -648,6 +654,8 @@ def forge_stream(
         quasi_identifiers=_split_csv_param(quasi_identifiers),
         sensitive_columns=_split_csv_param(sensitive_columns),
         auto_heal_enabled=auto_heal,
+        synthesis_mode=synthesis_mode,
+        dp_epsilon=dp_epsilon,
     )
 
     def event_generator():
