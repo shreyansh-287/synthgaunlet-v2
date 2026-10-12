@@ -30,6 +30,7 @@ from models import (
     CandidateEvaluation,
     ForgeRequest,
     ForgeResponse,
+    RescueAttempt,
     RoundResult,
     RunBlackboard,
     RunStartResponse,
@@ -152,6 +153,168 @@ def _assess_difficulty(n_rows: int, quasi_identifiers: list) -> Dict[str, str]:
     return {"difficulty": level, "difficulty_detail": detail}
 
 
+def _certification(passed: bool, rescued: bool) -> str:
+    if passed and rescued:
+        return "CERTIFIED_AFTER_RESCUE"
+    if passed:
+        return "CERTIFIED"
+    return "NOT_CERTIFIED"
+
+
+def _auto_heal(
+    *,
+    emit: ProgressFn,
+    run_id: str,
+    profile,
+    real_train: pd.DataFrame,
+    real_test: pd.DataFrame,
+    synth: pd.DataFrame,
+    plan,
+    cols: Dict[str, list],
+    n_rows: int,
+    thresholds: Thresholds,
+    generation_order: Optional[list],
+    prior: Optional[dict],
+    max_rounds: int,
+    best_score: float,
+) -> Optional[dict]:
+    """Three-step rescue ladder. Every attempt is scored on the original real split.
+
+    Returns None when the user aborts mid-rescue.
+    """
+    steps = (
+        (1, "tighten", "Tighten recombination, jitter, and the rare-category floor, then drop the closest 5% of DCR rows."),
+        (2, "generalize", "Bucket numeric quasi-identifiers, collapse categories under 2% to Other, and winsorize tails."),
+        (3, "second_generation", "Resample from the best failed candidate with stronger perturbation."),
+    )
+    emit({
+        "type": "rescue_started",
+        "attempts": len(steps),
+        "message": "Release gate failed. Auto-Heal rescue ladder started.",
+    })
+    numeric_qis = [
+        c for c in cols["quasi_identifiers"]
+        if c in real_train.columns and c in profiler.numeric_columns(real_train)
+    ]
+    best_synth = synth.copy()
+    origin_plan = plan
+    attempts: List[RescueAttempt] = []
+    extra_rounds: List[RoundResult] = []
+    passed = False
+    current = synth
+
+    for attempt, name, message in steps:
+        if _is_aborted(run_id):
+            emit({"type": "rescue_finished", "final_status": "NOT_CERTIFIED", "attempts_run": len(attempts), "passed": False})
+            return None
+        emit({
+            "type": "rescue_attempt",
+            "attempt": attempt,
+            "name": name,
+            "phase": "start",
+            "message": message,
+        })
+        rescue_plan = orchestrator.build_rescue_plan(attempt, origin_plan, numeric_qis)
+        if attempt == 1:
+            rescue_plan = generator.validate_and_repair_plan(
+                rescue_plan, real_train, cols["quasi_identifiers"]
+            )
+            current = generator.synthesize(
+                real_train, rescue_plan, n_rows, cols["quasi_identifiers"],
+                label_column=cols["label"], generation_order=generation_order, seed=9100 + attempt,
+            )
+            before = len(current)
+            current = generator.drop_low_dcr_rows(current, real_train, cols["quasi_identifiers"])
+            detail = f"{message} Kept {len(current)} of {before} rows."
+        elif attempt == 2:
+            current = generator.generalize_frame(
+                best_synth, real_train, cols["quasi_identifiers"], cols["label"]
+            )
+            detail = message
+        else:
+            rescue_plan = generator.validate_and_repair_plan(
+                rescue_plan, real_train, cols["quasi_identifiers"]
+            )
+            current = generator.second_generation(
+                best_synth, rescue_plan, n_rows, cols["quasi_identifiers"],
+                label_column=cols["label"], generation_order=generation_order, seed=9300 + attempt,
+            )
+            detail = message
+
+        utility = statistician.evaluate(real_train, real_test, current, cols["label"])
+        attack = attacker.attack(
+            profile, real_train, real_test, current, cols["quasi_identifiers"], prior=prior,
+        )
+        passed = orchestrator.decide(utility, attack, thresholds)
+        score = orchestrator.outcome_score(utility, attack, thresholds)
+        record = RescueAttempt(
+            attempt=attempt,
+            name=name,
+            passed=passed,
+            utility=utility,
+            attack=attack,
+            plan=rescue_plan,
+            rows_kept=int(len(current)),
+            detail=detail,
+        )
+        attempts.append(record)
+        round_result = RoundResult(
+            round_index=max_rounds + attempt,
+            utility=utility,
+            attack=attack,
+            passed=passed,
+            plan=rescue_plan,
+            orchestrator_feedback=detail,
+            evaluated_candidates=[
+                CandidateEvaluation(
+                    candidate_index=0,
+                    plan=rescue_plan,
+                    utility=utility,
+                    attack=attack,
+                    passed=passed,
+                    composite_score=score,
+                )
+            ],
+            winning_candidate_index=0,
+        )
+        extra_rounds.append(round_result)
+        emit({
+            "type": "rescue_attempt",
+            "attempt": attempt,
+            "name": name,
+            "phase": "done",
+            "passed": passed,
+            "message": f"{'PASS' if passed else 'FAIL'} — {detail}",
+            "rows_kept": int(len(current)),
+            "result": round_result.model_dump(),
+        })
+        prior = {
+            "re_id_rate": attack.re_id_rate,
+            "membership_accuracy": attack.membership_accuracy,
+            "generator_feedback": detail,
+        }
+        if passed:
+            best_synth = current
+            break
+        if score >= best_score:
+            best_score = score
+            best_synth = current.copy()
+
+    final_status = _certification(passed, rescued=passed)
+    emit({
+        "type": "rescue_finished",
+        "final_status": final_status,
+        "attempts_run": len(attempts),
+        "passed": passed,
+    })
+    return {
+        "synth": current,
+        "passed": passed,
+        "rounds": extra_rounds,
+        "attempts": attempts,
+    }
+
+
 def run_forge(
     req: ForgeRequest,
     progress: Optional[ProgressFn] = None,
@@ -162,7 +325,6 @@ def run_forge(
     run_id = run_id or uuid.uuid4().hex[:12]
     with _RUN_LOCK:
         _RUN_STATES.setdefault(run_id, {"status": "RUNNING", "progress": []})
-    max_rounds = min(settings.max_rounds, 5)
     thresholds = req.thresholds or Thresholds(
         fidelity_min=settings.fidelity_min,
         tstr_min=settings.tstr_min,
@@ -170,6 +332,7 @@ def run_forge(
         reid_max=settings.reid_max,
         membership_max=settings.membership_max,
     )
+    max_rounds = min(settings.max_rounds, thresholds.max_rounds, 5)
 
     def emit(event: dict):
         _record_event(run_id, event)
@@ -190,7 +353,8 @@ def run_forge(
         "quasi_identifiers": cols["quasi_identifiers"],
         "sensitive_columns": cols["sensitive_columns"],
         "label_column": cols["label"], "max_rounds": max_rounds,
-        "thresholds": thresholds.model_dump(), **difficulty,
+        "thresholds": thresholds.model_dump(),
+        "auto_heal_enabled": req.auto_heal_enabled, **difficulty,
     })
 
     # --- Split IN (train/profile) vs OUT (held-out for TSTR + membership) ---
@@ -228,6 +392,9 @@ def run_forge(
     rounds: List[RoundResult] = []
     passed = False
     synth = None
+    best_failed_synth = None
+    best_failed_plan = None
+    best_failed_score = float("-inf")
     prior_for_attacker: Optional[dict] = None
 
     for i in range(1, max_rounds + 1):
@@ -427,6 +594,11 @@ def run_forge(
 
         emit({"type": "round_result", "round": i, "result": round_result.model_dump()})
 
+        if not passed and synth is not None and winning_eval.composite_score >= best_failed_score:
+            best_failed_score = winning_eval.composite_score
+            best_failed_synth = synth.copy()
+            best_failed_plan = winning_plan
+
         if passed:
             break
 
@@ -447,6 +619,50 @@ def run_forge(
         emit({"type": "done", "response": aborted_resp.model_dump()})
         return aborted_resp
 
+    rescue_attempts: List[RescueAttempt] = []
+    if (
+        not passed
+        and req.auto_heal_enabled
+        and best_failed_synth is not None
+        and best_failed_plan is not None
+        and not _is_aborted(run_id)
+    ):
+        healed = _auto_heal(
+            emit=emit,
+            run_id=run_id,
+            profile=profile,
+            real_train=real_train,
+            real_test=real_test,
+            synth=best_failed_synth,
+            plan=best_failed_plan,
+            cols=cols,
+            n_rows=n_rows,
+            thresholds=thresholds,
+            generation_order=order,
+            prior=prior_for_attacker,
+            max_rounds=max_rounds,
+            best_score=best_failed_score,
+        )
+        if healed is None:
+            _RUN_CACHE.pop(run_id, None)
+            aborted_resp = ForgeResponse(
+                run_id=run_id, status="ABORTED", dataset_key=req.source.dataset_key,
+                domain=meta.domain, rounds=rounds, thresholds=thresholds,
+                llm_enabled=llm.is_enabled(), difficulty=difficulty["difficulty"],
+                difficulty_detail=difficulty["difficulty_detail"],
+                final_status="NOT_CERTIFIED",
+                auto_heal_enabled=req.auto_heal_enabled,
+            )
+            emit({"type": "done", "response": aborted_resp.model_dump()})
+            return aborted_resp
+        synth = healed["synth"]
+        passed = healed["passed"]
+        rounds.extend(healed["rounds"])
+        rescue_attempts = healed["attempts"]
+        for rescued_round in healed["rounds"]:
+            blackboard.round_history.append(rescued_round)
+
+    final_status = _certification(passed, rescued=bool(rescue_attempts) and passed)
     status = "SUCCESS" if passed else "FAILED_TO_CONVERGE"
 
     # --- Export + scorecard ---
@@ -463,6 +679,15 @@ def run_forge(
         difficulty=difficulty["difficulty"],
         difficulty_detail=difficulty["difficulty_detail"],
     )
+    if final_status == "CERTIFIED_AFTER_RESCUE":
+        scorecard += (
+            "\n\nAUTO-HEAL: CERTIFIED_AFTER_RESCUE. A rescue attempt passed the "
+            "release gate. Metrics were recomputed on the original real split."
+        )
+    elif rescue_attempts:
+        scorecard += (
+            "\n\nAUTO-HEAL: NOT_CERTIFIED. The rescue ladder did not pass the release gate."
+        )
     dual_scorecard = reporter.build_dual_scorecard(rounds, status, thresholds)
 
     response = ForgeResponse(
@@ -479,6 +704,9 @@ def run_forge(
         llm_enabled=llm.is_enabled(),
         difficulty=difficulty["difficulty"],
         difficulty_detail=difficulty["difficulty_detail"],
+        final_status=final_status,
+        rescue_attempts=rescue_attempts,
+        auto_heal_enabled=req.auto_heal_enabled,
     )
     emit({"type": "done", "response": response.model_dump()})
     return response

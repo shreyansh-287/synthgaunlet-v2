@@ -14,6 +14,7 @@ from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
+from sklearn.neighbors import NearestNeighbors
 
 import llm
 from agents.profiler import categorical_columns, numeric_columns
@@ -420,3 +421,138 @@ def _perturb_numeric(
             sampled[mask_valid] = np.round(sampled[mask_valid]).astype(int)
 
     return sampled
+
+
+# --------------------------------------------------------------------------- #
+# Auto-Heal row repairs. Deterministic. Never sent to an LLM.
+# --------------------------------------------------------------------------- #
+def drop_low_dcr_rows(
+    synth: pd.DataFrame,
+    real_train: pd.DataFrame,
+    quasi_identifiers: Optional[List[str]] = None,
+    percentile: float = 5.0,
+) -> pd.DataFrame:
+    """Drop synthetic rows in the lowest DCR percentile (too close to a real person)."""
+    cols = [c for c in (quasi_identifiers or []) if c in synth.columns and c in real_train.columns]
+    if not cols or len(synth) < 5 or real_train.empty:
+        return synth.reset_index(drop=True)
+
+    real_x = _qi_matrix(real_train, real_train, cols)
+    synth_x = _qi_matrix(synth, real_train, cols)
+    if real_x.shape[1] == 0 or synth_x.shape[0] == 0:
+        return synth.reset_index(drop=True)
+
+    distances = NearestNeighbors(n_neighbors=1).fit(real_x).kneighbors(synth_x)[0].ravel()
+    cutoff = float(np.quantile(distances, percentile / 100.0))
+    drop = distances <= cutoff
+    if drop.mean() > 0.5:
+        order = np.argsort(distances)
+        drop_n = max(1, int(np.ceil(len(distances) * percentile / 100.0)))
+        drop = np.zeros(len(distances), dtype=bool)
+        drop[order[:drop_n]] = True
+    kept = synth.loc[~drop].reset_index(drop=True)
+    return kept if not kept.empty else synth.reset_index(drop=True)
+
+
+def generalize_frame(
+    frame: pd.DataFrame,
+    real_train: pd.DataFrame,
+    quasi_identifiers: Optional[List[str]] = None,
+    label_column: Optional[str] = None,
+) -> pd.DataFrame:
+    """Bucket numeric QIs, collapse rare categories, and winsorize tails."""
+    out = frame.copy()
+    qis = [c for c in (quasi_identifiers or []) if c in out.columns and c in real_train.columns]
+    numeric_qis = [c for c in qis if c in numeric_columns(real_train)]
+
+    for col in numeric_columns(real_train):
+        if col not in out.columns:
+            continue
+        series = pd.to_numeric(out[col], errors="coerce")
+        lo = float(series.quantile(0.01))
+        hi = float(series.quantile(0.99))
+        if np.isfinite(lo) and np.isfinite(hi) and lo <= hi:
+            series = series.clip(lo, hi)
+        out[col] = series
+
+    for col in numeric_qis:
+        values = pd.to_numeric(out[col], errors="coerce")
+        if "age" in col.lower():
+            binned = np.floor(values.to_numpy(dtype=float) / 5.0) * 5.0
+        else:
+            binned = _quantile_bands(values, real_train[col])
+        if pd.api.types.is_integer_dtype(real_train[col]):
+            out[col] = pd.Series(np.round(binned), index=out.index).astype("Int64")
+        else:
+            out[col] = binned
+
+    for col in categorical_columns(out):
+        if col == label_column or col not in out.columns:
+            continue
+        labels = out[col].astype(str)
+        freqs = labels.value_counts(normalize=True)
+        rare = set(freqs[freqs < 0.02].index)
+        if rare and len(freqs) > len(rare):
+            out[col] = labels.where(~labels.isin(rare), "Other")
+    return out.reset_index(drop=True)
+
+
+def second_generation(
+    best_failed: pd.DataFrame,
+    plan: GenerationPlan,
+    n_rows: int,
+    quasi_identifiers: Optional[List[str]] = None,
+    label_column: Optional[str] = None,
+    generation_order: Optional[List[str]] = None,
+    seed: int = 9001,
+) -> pd.DataFrame:
+    """Sample a new table from the best failed candidate, then perturb it further."""
+    source = best_failed if best_failed is not None and not best_failed.empty else None
+    if source is None:
+        raise ValueError("Second-generation rescue needs a failed synthetic candidate.")
+    return synthesize(
+        source,
+        plan,
+        n_rows,
+        quasi_identifiers=quasi_identifiers,
+        label_column=label_column,
+        generation_order=generation_order,
+        seed=seed,
+    )
+
+
+def _qi_matrix(frame: pd.DataFrame, fit_frame: pd.DataFrame, cols: List[str]) -> np.ndarray:
+    pieces = []
+    for col in cols:
+        if col in numeric_columns(fit_frame):
+            fit = pd.to_numeric(fit_frame[col], errors="coerce")
+            mu = float(fit.mean()) if fit.notna().any() else 0.0
+            sd = float(fit.std(ddof=0)) or 1.0
+            vals = pd.to_numeric(frame[col], errors="coerce").fillna(mu)
+            pieces.append(((vals - mu) / sd).to_numpy().reshape(-1, 1))
+            continue
+        categories = list(dict.fromkeys(fit_frame[col].astype(str).fillna("").tolist()))
+        lookup = {cat: i for i, cat in enumerate(categories)}
+        width = max(len(categories), 1)
+        oh = np.zeros((len(frame), width), dtype=float)
+        for row_i, value in enumerate(frame[col].astype(str).fillna("")):
+            col_i = lookup.get(value)
+            if col_i is not None:
+                oh[row_i, col_i] = 1.0
+        pieces.append(oh)
+    if not pieces:
+        return np.zeros((len(frame), 0))
+    return np.hstack(pieces)
+
+
+def _quantile_bands(values: pd.Series, real_series: pd.Series) -> np.ndarray:
+    real = pd.to_numeric(real_series, errors="coerce").dropna().to_numpy(dtype=float)
+    current = pd.to_numeric(values, errors="coerce").to_numpy(dtype=float)
+    if real.size < 5:
+        return current
+    edges = np.unique(np.quantile(real, np.linspace(0.0, 1.0, 6)))
+    if edges.size < 2:
+        return current
+    idx = np.digitize(np.nan_to_num(current, nan=float(np.nanmedian(real))), edges[1:-1], right=True)
+    idx = np.clip(idx, 0, edges.size - 2)
+    return edges[idx]

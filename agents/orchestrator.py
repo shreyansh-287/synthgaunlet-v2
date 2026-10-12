@@ -43,6 +43,79 @@ def decide(utility: UtilityResult, attack: AttackResult, t: Thresholds) -> bool:
     )
 
 
+def outcome_score(utility: UtilityResult, attack: AttackResult, t: Thresholds) -> float:
+    """Deterministic rank used to pick the best failed candidate for rescue."""
+    comp_util = (
+        utility.fidelity_score * 0.40
+        + utility.utility_ratio * 0.40
+        + utility.query_equivalence * 0.20
+    )
+    priv_passed = (
+        attack.re_id_rate <= t.reid_max
+        and attack.membership_accuracy <= t.membership_max
+    )
+    util_passed = (
+        utility.fidelity_score >= t.fidelity_min
+        and utility.utility_ratio >= t.tstr_min
+        and utility.query_equivalence >= t.query_equivalence_min
+    )
+    if priv_passed and util_passed:
+        score = 100.0 + comp_util
+    elif priv_passed:
+        score = 50.0 + comp_util
+    else:
+        reid_excess = max(0.0, attack.re_id_rate - t.reid_max)
+        mem_excess = max(0.0, attack.membership_accuracy - t.membership_max)
+        penalty = (reid_excess * 100.0) + (mem_excess * 20.0)
+        score = comp_util - penalty
+    return round(float(score), 4)
+
+
+def build_rescue_plan(
+    attempt: int,
+    plan: GenerationPlan,
+    numeric_quasi_identifiers: Optional[List[str]] = None,
+) -> GenerationPlan:
+    """Knob settings for one Auto-Heal attempt. Row repair stays in the generator."""
+    numeric_qis = list(numeric_quasi_identifiers or [])
+    if attempt == 1:
+        return plan.model_copy(update={
+            "plan_name": "rescue_tighten",
+            "recombination": max(0.65, float(plan.recombination)),
+            "numeric_noise": min(1.0, float(plan.numeric_noise) * 1.5),
+            "rare_category_floor": max(0.05, float(plan.rare_category_floor)),
+            "rationale": (
+                "Rescue attempt 1: recombination at least 0.65, jitter up 50%, "
+                "rare-category floor 0.05, then drop the closest DCR rows."
+            ),
+        })
+    if attempt == 2:
+        bands = dict(plan.generalize_columns)
+        for col in numeric_qis:
+            bands[col] = 5.0 if "age" in col.lower() else max(float(bands.get(col, 0.0)), 1.0)
+        return plan.model_copy(update={
+            "plan_name": "rescue_generalize",
+            "generalize_columns": bands,
+            "rare_category_floor": max(0.02, float(plan.rare_category_floor)),
+            "rationale": (
+                "Rescue attempt 2: bucket numeric quasi-identifiers, collapse "
+                "categories under 2% to Other, and winsorize the 1st/99th percentiles."
+            ),
+        })
+    return plan.model_copy(update={
+        "plan_name": "rescue_second_generation",
+        "recombination": min(1.0, max(0.85, float(plan.recombination) + 0.2)),
+        "numeric_noise": min(1.0, float(plan.numeric_noise) * 1.5 + 0.05),
+        "categorical_shuffle": min(1.0, float(plan.categorical_shuffle) + 0.15),
+        "rare_category_floor": max(0.05, float(plan.rare_category_floor)),
+        "copula_rank_preservation": False,
+        "rationale": (
+            "Rescue attempt 3: sample a new table from the best failed candidate "
+            "with stronger perturbation."
+        ),
+    })
+
+
 def select_pareto_candidate(
     evaluations: List[CandidateEvaluation],
     t: Thresholds,
@@ -56,35 +129,8 @@ def select_pareto_candidate(
     if not evaluations:
         return 0
 
-    # Calculate composite utility and compliance
     for i, e in enumerate(evaluations):
-        comp_util = (
-            e.utility.fidelity_score * 0.40
-            + e.utility.utility_ratio * 0.40
-            + e.utility.query_equivalence * 0.20
-        )
-        priv_passed = (
-            e.attack.re_id_rate <= t.reid_max
-            and e.attack.membership_accuracy <= t.membership_max
-        )
-        util_passed = (
-            e.utility.fidelity_score >= t.fidelity_min
-            and e.utility.utility_ratio >= t.tstr_min
-            and e.utility.query_equivalence >= t.query_equivalence_min
-        )
-
-        if priv_passed and util_passed:
-            score = 100.0 + comp_util
-        elif priv_passed:
-            score = 50.0 + comp_util
-        else:
-            # Penalize privacy leakage heavily
-            reid_excess = max(0.0, e.attack.re_id_rate - t.reid_max)
-            mem_excess = max(0.0, e.attack.membership_accuracy - t.membership_max)
-            penalty = (reid_excess * 100.0) + (mem_excess * 20.0)
-            score = comp_util - penalty
-
-        evaluations[i].composite_score = round(float(score), 4)
+        evaluations[i].composite_score = outcome_score(e.utility, e.attack, t)
 
     # Pick candidate with highest composite score
     best_idx = 0

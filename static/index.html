@@ -686,6 +686,15 @@
         </div>
       </section>
 
+      <!-- Auto-Heal rescue ladder -->
+      <section id="rescueSection" class="hidden bg-slate-900/90 rounded-3xl p-5 sm:p-6 border border-amber-500/40 shadow-xl space-y-3">
+        <div class="flex items-center justify-between gap-3">
+          <h4 class="text-sm font-bold text-amber-200 uppercase tracking-wide">Auto-Heal Rescue</h4>
+          <span id="rescueStatus" class="text-[10px] font-bold uppercase tracking-wider text-amber-300"></span>
+        </div>
+        <ol id="rescueLadder" class="space-y-2 text-xs"></ol>
+      </section>
+
       <!-- Live Activity Log & Rounds Table -->
       <section id="liveSection" class="hidden grid md:grid-cols-2 gap-6">
         <div class="bg-slate-900/90 rounded-3xl p-6 border border-slate-800 shadow-xl">
@@ -757,6 +766,10 @@
             </div>
             <!-- Actions Stack -->
             <div class="flex flex-col gap-2 shrink-0 w-full sm:w-60">
+              <div id="downloadBlocked" class="hidden rounded-xl border border-rose-500/40 bg-rose-500/10 px-3 py-2.5 text-left">
+                <p class="text-[11px] font-extrabold text-rose-200">This file is not fit to download</p>
+                <ul id="downloadBlockedReasons" class="mt-1.5 space-y-1 text-[11px] leading-snug text-rose-100/90 list-disc pl-4"></ul>
+              </div>
               <a id="topDownloadBtn" href="#" download
                  class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs shadow-md shadow-emerald-500/20 transition transform hover:-translate-y-0.5 text-center">
                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
@@ -1266,6 +1279,47 @@ async function persistHistoryItem(item){
 }
 function pct(x){ return (x*100).toFixed(1)+'%'; }
 
+function isCertified(resp) {
+  if (!resp || resp.status !== 'SUCCESS') return false;
+  return !resp.final_status || resp.final_status === 'CERTIFIED' || resp.final_status === 'CERTIFIED_AFTER_RESCUE';
+}
+
+function releaseFailureReasons(resp) {
+  const fallback = ['The release gate was not passed, so this table is not certified for download.'];
+  const rounds = (resp && resp.rounds) || [];
+  if (!rounds.length) return fallback;
+  const finalRound = rounds[rounds.length - 1];
+  const u = finalRound.utility || {};
+  const a = finalRound.attack || {};
+  const t = (resp && resp.thresholds) || state.thresholds || {};
+  const checks = [
+    [u.fidelity_score, t.fidelity_min, 'at least', 'Distribution fidelity'],
+    [u.utility_ratio, t.tstr_min, 'at least', 'Utility ratio (train on synthetic, test on real)'],
+    [u.query_equivalence, t.query_equivalence_min, 'at least', 'Query equivalence'],
+    [a.re_id_rate, t.reid_max, 'at most', 'Re-identification risk'],
+    [a.membership_accuracy, t.membership_max, 'at most', 'Membership leakage'],
+  ];
+  const reasons = [];
+  checks.forEach(([value, limit, direction, label]) => {
+    const measured = Number(value);
+    const ceiling = Number(limit);
+    if (!Number.isFinite(measured) || !Number.isFinite(ceiling)) return;
+    const failed = direction === 'at least' ? measured < ceiling : measured > ceiling;
+    if (failed) reasons.push(`${label} is ${pct(measured)}. It must be ${direction} ${pct(ceiling)}.`);
+  });
+  return reasons.length ? reasons : fallback;
+}
+
+function downloadBlockedHtml(resp) {
+  const items = releaseFailureReasons(resp).map(reason => `<li>${escapeHtml(reason)}</li>`).join('');
+  return `
+    <div class="sm:col-span-2 rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-left">
+      <p class="text-xs font-extrabold text-rose-200">This file is not fit to download</p>
+      <ul class="mt-2 space-y-1 text-[11px] leading-snug text-rose-100/90 list-disc pl-4">${items}</ul>
+    </div>
+  `;
+}
+
 async function clearAllHistory(){
   if(!confirm("Clear all recent history records?")) return;
   try {
@@ -1478,9 +1532,9 @@ function renderHistoryReportModalContent(item, runResult) {
   `;
 
   if (runResult) {
-    const isOk = runResult.status === 'SUCCESS';
-    const bannerClass = isOk ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-200' : 'bg-amber-500/10 border-amber-500/40 text-amber-200';
-    const verdictText = isOk ? 'Certified Safe & Useful' : 'Synthetic data did not fully converge (Best attempt)';
+    const isOk = isCertified(runResult);
+    const bannerClass = isOk ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-200' : 'bg-rose-500/10 border-rose-500/40 text-rose-200';
+    const verdictText = isOk ? 'Certified Safe & Useful' : 'This file is not fit to download';
 
     html += `
       <div class="p-5 rounded-2xl border ${bannerClass} space-y-1">
@@ -1488,7 +1542,7 @@ function renderHistoryReportModalContent(item, runResult) {
           <span>${isOk ? '✅' : '⚠️'}</span>
           <span>${verdictText}</span>
         </div>
-        <p class="text-xs text-slate-300 leading-snug">${escapeHtml(runResult.scorecard_summary || 'Analysis complete.')}</p>
+        <p class="text-xs text-slate-300 leading-snug">${escapeHtml(isOk ? (runResult.scorecard_summary || 'Analysis complete.') : releaseFailureReasons(runResult).join(' '))}</p>
       </div>
     `;
 
@@ -1544,21 +1598,25 @@ function renderHistoryReportModalContent(item, runResult) {
     }
 
     if (runResult.run_id) {
-      const dsName = item.name || item.dataset || 'synthetic_dataset';
-      html += `
-        <div class="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-          <a href="/api/v1/export/${runResult.run_id}?format=csv" download
-             class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs shadow-lg shadow-indigo-600/30 transition text-center">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-            Download CSV
-          </a>
-          <button onclick="openBqExportModal('${runResult.run_id}', '${escapeHtml(dsName)}')"
-             class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs shadow-lg shadow-blue-600/30 transition text-center cursor-pointer">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 7v10c0 2.21 3.58 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.58 4 8 4s8-1.79 8-4M4 7c0-2.21 3.58-4 8-4s8 1.79 8 4m0 5c0 2.21-3.58 4-8 4s-8-1.79-8-4"/></svg>
-            Export to BigQuery
-          </button>
-        </div>
-      `;
+      if (!isCertified(runResult)) {
+        html += `<div class="pt-2">${downloadBlockedHtml(runResult)}</div>`;
+      } else {
+        const dsName = item.name || item.dataset || 'synthetic_dataset';
+        html += `
+          <div class="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <a href="/api/v1/export/${runResult.run_id}?format=csv" download
+               class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs shadow-lg shadow-indigo-600/30 transition text-center">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+              Download CSV
+            </a>
+            <button onclick="openBqExportModal('${runResult.run_id}', '${escapeHtml(dsName)}')"
+               class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs shadow-lg shadow-blue-600/30 transition text-center cursor-pointer">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 7v10c0 2.21 3.58 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.58 4 8 4s8-1.79 8-4M4 7c0-2.21 3.58-4 8-4s8 1.79 8 4m0 5c0 2.21-3.58 4-8 4s-8-1.79-8-4"/></svg>
+              Export to BigQuery
+            </button>
+          </div>
+        `;
+      }
     }
   } else {
     html += `
@@ -1584,22 +1642,40 @@ function renderScorecard(resp) {
   const detail  = el('verdictDetail');
   if (!banner) return;
 
-  if (isOk) {
+  const downloadBtn = el('topDownloadBtn');
+  const exportBtn = el('topBqExportBtn');
+  const blocked = el('downloadBlocked');
+  const certified = isCertified(resp);
+
+  if (certified) {
+    const afterRescue = resp.final_status === 'CERTIFIED_AFTER_RESCUE';
     banner.className   = 'rounded-3xl p-6 border shadow-2xl bg-emerald-500/10 border-emerald-500/40';
     icon.textContent   = '✅';
-    headline.textContent = 'Synthetic data is safe to use';
-    badge.textContent  = 'CERTIFIED SAFE & USEFUL';
+    headline.textContent = afterRescue ? 'Certified after Auto-Heal rescue' : 'Synthetic data is safe to use';
+    badge.textContent  = afterRescue ? 'CERTIFIED AFTER RESCUE' : 'CERTIFIED SAFE & USEFUL';
     badge.className    = 'px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 uppercase tracking-wide';
-    detail.textContent = 'All utility and privacy release gates passed. This dataset is certified safe for sharing, modelling, and research — go ahead and use it.';
-    el('topDownloadBtn').className = 'w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs shadow-md shadow-emerald-500/20 transition transform hover:-translate-y-0.5 text-center';
+    detail.textContent = afterRescue
+      ? 'The adversarial rounds missed the release gate. Auto-Heal repaired the table, and that rescue attempt passed every utility and privacy check on the original data.'
+      : 'All utility and privacy release gates passed. This dataset is certified safe for sharing, modelling, and research — go ahead and use it.';
+    downloadBtn.className = 'w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs shadow-md shadow-emerald-500/20 transition transform hover:-translate-y-0.5 text-center';
+    downloadBtn.classList.remove('hidden');
+    if (exportBtn) exportBtn.classList.remove('hidden');
+    if (blocked) blocked.classList.add('hidden');
   } else {
-    banner.className   = 'rounded-3xl p-6 border shadow-2xl bg-amber-500/10 border-amber-500/40';
-    icon.textContent   = '⚠️';
-    headline.textContent = 'Synthetic data did not fully pass — use with caution';
-    badge.textContent  = 'NOT CONVERGED (BEST ATTEMPT)';
-    badge.className    = 'px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 uppercase tracking-wide';
-    detail.textContent = 'Some privacy or utility checks failed on this dataset. The best candidate generated is available for download, but we do not recommend using it in production without further review.';
-    el('topDownloadBtn').className = 'w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs shadow-md shadow-amber-500/20 transition transform hover:-translate-y-0.5 text-center';
+    banner.className   = 'rounded-3xl p-6 border shadow-2xl bg-rose-500/10 border-rose-500/40';
+    icon.textContent   = '🛑';
+    headline.textContent = 'This file is not fit to download';
+    badge.textContent  = 'NOT CERTIFIED';
+    badge.className    = 'px-2.5 py-0.5 text-[10px] font-bold rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 uppercase tracking-wide';
+    detail.textContent = 'The release gate failed, so this synthetic table is not available for download or export.';
+    downloadBtn.removeAttribute('href');
+    downloadBtn.classList.add('hidden');
+    if (exportBtn) exportBtn.classList.add('hidden');
+    if (blocked) {
+      blocked.classList.remove('hidden');
+      el('downloadBlockedReasons').innerHTML = releaseFailureReasons(resp)
+        .map(reason => `<li>${escapeHtml(reason)}</li>`).join('');
+    }
   }
 
   if (resp.rounds && resp.rounds.length > 0) {
@@ -2798,6 +2874,38 @@ function logLine(agentKey, msg, done){
   wrap.prepend(div);
 }
 
+function showRescueLadder(message){
+  const section = el('rescueSection');
+  if (section) section.classList.remove('hidden');
+  const status = el('rescueStatus');
+  if (status && message) status.textContent = 'In progress';
+}
+
+function markRescueStep(ev){
+  showRescueLadder();
+  const list = el('rescueLadder');
+  if (!list) return;
+  const labels = {
+    tighten: '1 · Tighten',
+    generalize: '2 · Generalize',
+    second_generation: '3 · Second generation',
+  };
+  let item = document.getElementById('rescue-step-' + ev.attempt);
+  if (!item) {
+    item = document.createElement('li');
+    item.id = 'rescue-step-' + ev.attempt;
+    list.appendChild(item);
+  }
+  const state = ev.phase === 'done' ? (ev.passed ? 'passed' : 'failed') : 'running';
+  const tone = state === 'passed'
+    ? 'border-emerald-500/40 text-emerald-200'
+    : state === 'failed'
+      ? 'border-rose-500/40 text-rose-200'
+      : 'border-amber-500/40 text-amber-100';
+  item.className = 'rounded-xl border bg-slate-950/70 px-3 py-2 ' + tone;
+  item.textContent = (labels[ev.name] || ev.name) + ' — ' + (ev.message || state);
+}
+
 function addRoundRow(r){
   const u=r.utility,a=r.attack;
   const tr=document.createElement('tr'); tr.className='fade-in hover:bg-slate-800/40';
@@ -2893,7 +3001,7 @@ async function confirmAbortRun(){
   updateActiveHistoryStatus('ABORTED');
   
   // Hide active stream cards & scorecard
-  ['castSection','metricsSection','liveSection','scorecardSection','difficultyBanner'].forEach(id=>el(id).classList.add('hidden'));
+  ['castSection','metricsSection','liveSection','scorecardSection','difficultyBanner','rescueSection'].forEach(id=>el(id).classList.add('hidden'));
   
   // Reset run buttons
   el('runBtn').disabled = false;
@@ -2944,7 +3052,8 @@ function run(){
   }
 
 
-  ['roundsBody','log'].forEach(id=>el(id).innerHTML='');
+  ['roundsBody','log','rescueLadder'].forEach(id=>{ const node=el(id); if(node) node.innerHTML=''; });
+  el('rescueSection')?.classList.add('hidden');
   renderCast();
   ['castSection','metricsSection','liveSection'].forEach(id=>el(id).classList.remove('hidden'));
   el('scorecardSection').classList.add('hidden');
@@ -2990,6 +3099,22 @@ function run(){
         updateMetrics(ev.result.utility, ev.result.attack);
         addRoundRow(ev.result);
         break;
+      case 'rescue_started':
+        showRescueLadder(ev.message || 'Release gate failed. Auto-Heal started.');
+        logLine(null, ev.message || 'Auto-Heal rescue started.');
+        break;
+      case 'rescue_attempt':
+        markRescueStep(ev);
+        if (ev.phase === 'done' && ev.result) {
+          updateMetrics(ev.result.utility, ev.result.attack);
+          addRoundRow(ev.result);
+        }
+        logLine('orchestrator', ev.message, ev.phase === 'done');
+        break;
+      case 'rescue_finished':
+        if (el('rescueStatus')) el('rescueStatus').textContent = ev.final_status || '';
+        logLine(null, 'Auto-Heal finished: ' + (ev.final_status || 'done'));
+        break;
       case 'done':
         finish(ev.response); es.close(); activeEventSource=null; break;
       case 'error':
@@ -3022,19 +3147,20 @@ function finish(resp){
   if(resp && resp.status === 'ABORTED'){
     logLine(null, '🛑 Execution aborted. Zero synthetic data generated.');
     updateActiveHistoryStatus('ABORTED');
-    ['castSection','metricsSection','liveSection','scorecardSection','difficultyBanner'].forEach(id=>el(id).classList.add('hidden'));
+    ['castSection','metricsSection','liveSection','scorecardSection','difficultyBanner','rescueSection'].forEach(id=>el(id).classList.add('hidden'));
     return;
   }
 
   updateActiveHistoryStatus(resp ? resp.status : 'SUCCESS', resp);
   Object.keys(AGENTS).forEach(k=>setAgent(k,null,true));
   
-  const downloadUrl = `/api/v1/export/${resp.run_id}?format=csv`;
-  el('topDownloadBtn').href = downloadUrl;
-  const topBqBtn = el('topBqExportBtn');
-  if (topBqBtn) {
-    const dsName = state.dataset || (state.upload ? state.upload.filename : 'synthetic_dataset');
-    topBqBtn.onclick = () => openBqExportModal(resp.run_id, dsName);
+  if (isCertified(resp)) {
+    el('topDownloadBtn').href = `/api/v1/export/${resp.run_id}?format=csv`;
+    const topBqBtn = el('topBqExportBtn');
+    if (topBqBtn) {
+      const dsName = state.dataset || (state.upload ? state.upload.filename : 'synthetic_dataset');
+      topBqBtn.onclick = () => openBqExportModal(resp.run_id, dsName);
+    }
   }
 
   renderScorecard(resp);
@@ -3048,21 +3174,23 @@ function finish(resp){
     resp.rounds.forEach(r => addRoundRow(r));
   }
 
-  const isOk = resp.status === 'SUCCESS';
-  const verdict = isOk
+  const isOk = isCertified(resp);
+  const verdict = resp.final_status === 'CERTIFIED_AFTER_RESCUE'
+    ? '✅ Certified after Auto-Heal rescue: proven USEFUL and SAFE.'
+    : isOk
     ? '✅ Converged: proven USEFUL and SAFE.'
-    : '⚠️ Honest verdict: could not certify safety on this dataset (best attempt ready for download).';
+    : '🛑 Not certified. This file is not fit to download. ' + releaseFailureReasons(resp).join(' ');
   logLine(null, verdict);
   el('runBtn').disabled = false;
 }
 
 function startNewAnalysis(){
   // Hide all result sections
-  ['castSection','metricsSection','liveSection','scorecardSection','difficultyBanner'].forEach(id => {
+  ['castSection','metricsSection','liveSection','scorecardSection','difficultyBanner','rescueSection'].forEach(id => {
     const s = el(id); if(s){ s.classList.add('hidden'); }
   });
   // Clear round table + log
-  ['roundsBody','log'].forEach(id => { const e = el(id); if(e) e.innerHTML=''; });
+  ['roundsBody','log','rescueLadder'].forEach(id => { const e = el(id); if(e) e.innerHTML=''; });
   
   // Completely reset selected datasets (CSV, BigQuery, and Samples)
   resetAllDatasetSelections();
