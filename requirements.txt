@@ -19,6 +19,16 @@ google-cloud-bigquery>=3.0.0
 db-dtypes==1.4.4
 google-auth>=2.0.0
 
+# Multi-format upload, certificates, and PII remediation
+openpyxl
+pyarrow
+reportlab
+qrcode
+faker
+
+# MCP tools for synthesis status and certificate checks
+fastmcp
+
 # Configuration and verification
 python-dotenv
 pytest
