@@ -192,6 +192,19 @@ class RunBlackboard(BaseModel):
     orchestrator_feedback_history: List[str] = Field(default_factory=list)
 
 
+class RescueAttempt(BaseModel):
+    """One deterministic Auto-Heal repair, re-scored on the original real split."""
+
+    attempt: int = Field(ge=1, le=3)
+    name: str  # tighten | generalize | second_generation
+    passed: bool
+    utility: AuditMetrics
+    attack: PrivacyAttackResults
+    plan: SynthesisConfig
+    rows_kept: int = 0
+    detail: str = ""
+
+
 class Thresholds(BaseModel):
     max_rounds: int = Field(5, ge=1, le=5)
     fidelity_min: float = Field(0.82, ge=0.0, le=1.0)
@@ -231,6 +244,7 @@ class ForgeRequest(BaseModel):
     n_rows: Optional[int] = Field(None, ge=1, le=50_000)
     destination_table_id: Optional[str] = None
     thresholds: Optional[Thresholds] = None
+    auto_heal_enabled: bool = True
 
 
 class ForgeResponse(BaseModel):
@@ -247,6 +261,10 @@ class ForgeResponse(BaseModel):
     llm_enabled: bool = False
     difficulty: str = ""          # "easy" | "moderate" | "hard"
     difficulty_detail: str = ""   # plain-English why
+    # CERTIFIED | CERTIFIED_AFTER_RESCUE | NOT_CERTIFIED. Empty when aborted.
+    final_status: str = ""
+    rescue_attempts: List[RescueAttempt] = Field(default_factory=list)
+    auto_heal_enabled: bool = False
 
 
 class RunStartResponse(BaseModel):

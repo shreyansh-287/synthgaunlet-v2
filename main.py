@@ -297,6 +297,10 @@ def bq_export(body: BQExportRequest):
     if not body.table:
         raise HTTPException(status_code=400, detail="Target BigQuery table name is required.")
 
+    blocked = _uncertified_download_detail(body.run_id)
+    if blocked:
+        raise HTTPException(status_code=403, detail=blocked)
+
     if not bq.is_bq_available():
         raise HTTPException(
             status_code=503,
@@ -615,6 +619,7 @@ def forge_stream(
     label: Optional[str] = None,
     quasi_identifiers: Optional[str] = None,
     sensitive_columns: Optional[str] = None,
+    auto_heal: bool = True,
 ):
     """Server-Sent Events stream of the round-by-round adversarial duel.
 
@@ -642,6 +647,7 @@ def forge_stream(
         label_column=label,
         quasi_identifiers=_split_csv_param(quasi_identifiers),
         sensitive_columns=_split_csv_param(sensitive_columns),
+        auto_heal_enabled=auto_heal,
     )
 
     def event_generator():
@@ -678,8 +684,21 @@ def forge_stream(
     )
 
 
+def _uncertified_download_detail(run_id: str) -> Optional[str]:
+    """Refuse a file hand-off when this process still knows the run failed the gate."""
+    status = get_run_status(run_id)
+    if status is None or status.response is None or status.response.status == "SUCCESS":
+        return None
+    return (
+        "This synthetic file is not certified, so it is not available for download."
+    )
+
+
 @app.get("/api/v1/export/{run_id}")
 def export(run_id: str, format: str = "csv"):
+    blocked = _uncertified_download_detail(run_id)
+    if blocked:
+        raise HTTPException(status_code=403, detail=blocked)
     frame = get_run_frame(run_id)
     if frame is None:
         raise HTTPException(status_code=404, detail=f"Unknown run_id '{run_id}'.")
