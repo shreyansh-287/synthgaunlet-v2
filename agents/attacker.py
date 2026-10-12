@@ -14,6 +14,7 @@ import pandas as pd
 
 import llm
 from agents import attack_tools
+from agents.attacks.registry import run_attacks, extended_attacks
 from config import get_settings
 from models import AttackResult, DatasetProfile
 
@@ -218,9 +219,15 @@ def attack(
             )
 
     # Record WORST-CASE (maximum risk) observed across all attack passes
+    extended = run_attacks(extended_attacks(), real_train, real_test, synth, profile)
+    tools_used.extend(result.name for result in extended.values())
+
     worst_re_id = max(p["re_id_rate"] for p in all_passes)
     worst_membership = max(p["membership_accuracy"] for p in all_passes)
     worst_outlier = max(p["outlier_linkage_rate"] for p in all_passes)
+    attribute_advantage = float(extended["attribute_inference"].score)
+    linkage_rate = float(extended["linkage"].score)
+    near_duplicate_rate = float(extended["near_duplicate"].score)
 
     flagged_examples = []
     for p in all_passes:
@@ -238,6 +245,9 @@ def attack(
         re_id_rate=round(worst_re_id, 4),
         membership_accuracy=round(worst_membership, 4),
         outlier_linkage_rate=round(worst_outlier, 4),
+        attribute_inference_advantage=round(attribute_advantage, 4),
+        linkage_rate=round(linkage_rate, 4),
+        near_duplicate_rate=round(near_duplicate_rate, 4),
         flagged_examples=flagged_examples[:5],
         attacker_strategy=strategy,
         tools_used=list(dict.fromkeys(tools_used)),

@@ -142,6 +142,7 @@ class AuditMetrics(BaseModel):
     utility_ratio: float = 0.0            # L4: TSTR acc_synth / acc_real
     tstr_detail: Dict[str, Any] = Field(default_factory=dict)
     diagnostic_report: Optional[DiagnosticReport] = None
+    fairness: Optional["FairnessReport"] = None
 
 
 # --------------------------------------------------------------------------- #
@@ -151,10 +152,34 @@ class PrivacyAttackResults(BaseModel):
     re_id_rate: float
     membership_accuracy: float
     outlier_linkage_rate: float = 0.0
+    attribute_inference_advantage: float = 0.0
+    linkage_rate: float = 0.0
+    near_duplicate_rate: float = 0.0
     flagged_examples: List[Dict[str, Any]] = Field(default_factory=list)
     attacker_strategy: str = ""
     tools_used: List[str] = Field(default_factory=list)
     attacked_columns: List[str] = Field(default_factory=list)
+
+
+class FairnessGroupResult(BaseModel):
+    attribute: str
+    group: str
+    real_share: float
+    synth_share: float
+    label_gap: float = 0.0
+    subgroup_utility: Optional[float] = None
+    status: str = "PASS"  # PASS | WARN
+
+
+class FairnessReport(BaseModel):
+    status: str = "PASS"  # PASS | WARN
+    attributes: List[str] = Field(default_factory=list)
+    representation_tvd: Dict[str, float] = Field(default_factory=dict)
+    groups: List[FairnessGroupResult] = Field(default_factory=list)
+    summary: str = ""
+
+
+AuditMetrics.model_rebuild()
 
 
 # --------------------------------------------------------------------------- #
@@ -212,6 +237,9 @@ class Thresholds(BaseModel):
     query_equivalence_min: float = Field(0.95, ge=0.0, le=1.0)
     reid_max: float = Field(0.01, ge=0.0, le=1.0)
     membership_max: float = Field(0.60, ge=0.0, le=1.0)
+    attribute_inference_max: float = Field(0.25, ge=0.0, le=1.0)
+    linkage_max: float = Field(0.15, ge=0.0, le=1.0)
+    near_duplicate_max: float = Field(0.10, ge=0.0, le=1.0)
 
 
 class DualScorecard(BaseModel):

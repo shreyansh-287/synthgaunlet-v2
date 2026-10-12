@@ -32,14 +32,23 @@ _SYSTEM = (
 )
 
 
+def _privacy_failing(attack: AttackResult, t: Thresholds) -> bool:
+    return (
+        attack.re_id_rate > t.reid_max
+        or attack.membership_accuracy > t.membership_max
+        or attack.attribute_inference_advantage > t.attribute_inference_max
+        or attack.linkage_rate > t.linkage_max
+        or attack.near_duplicate_rate > t.near_duplicate_max
+    )
+
+
 def decide(utility: UtilityResult, attack: AttackResult, t: Thresholds) -> bool:
     """100% deterministic release gate. Pure code, no LLM."""
     return (
         utility.fidelity_score >= t.fidelity_min
         and utility.utility_ratio >= t.tstr_min
         and utility.query_equivalence >= t.query_equivalence_min
-        and attack.re_id_rate <= t.reid_max
-        and attack.membership_accuracy <= t.membership_max
+        and not _privacy_failing(attack, t)
     )
 
 
@@ -50,10 +59,7 @@ def outcome_score(utility: UtilityResult, attack: AttackResult, t: Thresholds) -
         + utility.utility_ratio * 0.40
         + utility.query_equivalence * 0.20
     )
-    priv_passed = (
-        attack.re_id_rate <= t.reid_max
-        and attack.membership_accuracy <= t.membership_max
-    )
+    priv_passed = not _privacy_failing(attack, t)
     util_passed = (
         utility.fidelity_score >= t.fidelity_min
         and utility.utility_ratio >= t.tstr_min
@@ -66,7 +72,16 @@ def outcome_score(utility: UtilityResult, attack: AttackResult, t: Thresholds) -
     else:
         reid_excess = max(0.0, attack.re_id_rate - t.reid_max)
         mem_excess = max(0.0, attack.membership_accuracy - t.membership_max)
-        penalty = (reid_excess * 100.0) + (mem_excess * 20.0)
+        attribute_excess = max(0.0, attack.attribute_inference_advantage - t.attribute_inference_max)
+        linkage_excess = max(0.0, attack.linkage_rate - t.linkage_max)
+        duplicate_excess = max(0.0, attack.near_duplicate_rate - t.near_duplicate_max)
+        penalty = (
+            (reid_excess * 100.0)
+            + (mem_excess * 20.0)
+            + (attribute_excess * 40.0)
+            + (linkage_excess * 40.0)
+            + (duplicate_excess * 40.0)
+        )
         score = comp_util - penalty
     return round(float(score), 4)
 
@@ -185,7 +200,7 @@ def diagnose_and_advise(
         return str(data.get("feedback"))
 
     # Rule-based fallback
-    if a.re_id_rate > t.reid_max or a.membership_accuracy > t.membership_max:
+    if _privacy_failing(a, t):
         return (
             f"Privacy leaking on {a.attacked_columns}: increase recombination and apply "
             "generalization to quasi-identifiers."
@@ -249,10 +264,6 @@ def next_plan(
     return _rule_based(plan, utility, attack, t)
 
 
-def _privacy_failing(attack: AttackResult, t: Thresholds) -> bool:
-    return attack.re_id_rate > t.reid_max or attack.membership_accuracy > t.membership_max
-
-
 def _utility_failing(utility: UtilityResult, t: Thresholds) -> bool:
     return (
         utility.fidelity_score < t.fidelity_min
@@ -262,7 +273,7 @@ def _utility_failing(utility: UtilityResult, t: Thresholds) -> bool:
 
 
 def _rule_based(plan, utility, attack, t) -> Tuple[GenerationPlan, str]:
-    privacy_failing = attack.re_id_rate > t.reid_max or attack.membership_accuracy > t.membership_max
+    privacy_failing = _privacy_failing(attack, t)
     utility_failing = _utility_failing(utility, t)
 
     recombination = plan.recombination
