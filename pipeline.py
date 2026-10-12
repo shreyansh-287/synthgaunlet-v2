@@ -241,7 +241,7 @@ def _auto_heal(
             )
             detail = message
 
-        utility = statistician.evaluate(real_train, real_test, current, cols["label"])
+        utility = statistician.evaluate(real_train, real_test, current, cols["label"], profile=profile)
         attack = attacker.attack(
             profile, real_train, real_test, current, cols["quasi_identifiers"], prior=prior,
         )
@@ -508,7 +508,7 @@ def run_forge(
         for cand_synth in candidate_synths:
             if _is_aborted(run_id):
                 break
-            cand_utils.append(statistician.evaluate(real_train, real_test, cand_synth, cols["label"]))
+            cand_utils.append(statistician.evaluate(real_train, real_test, cand_synth, cols["label"], profile=profile))
 
         best_fid = max(u.fidelity_score for u in cand_utils) if cand_utils else 0.0
         best_tstr = max(u.utility_ratio for u in cand_utils) if cand_utils else 0.0

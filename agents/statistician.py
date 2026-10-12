@@ -17,6 +17,7 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.metrics import accuracy_score, r2_score
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
+from agents import fairness
 from agents.profiler import categorical_columns, is_numeric, numeric_columns
 from models import BrokenRelationship, DiagnosticReport, UtilityResult
 
@@ -255,11 +256,25 @@ def tstr(
     }
 
 
+def _fairness_profile(frame: pd.DataFrame, label_column: Optional[str]):
+    from models import ColumnProfile, DatasetProfile
+
+    return DatasetProfile(
+        columns=[
+            ColumnProfile(name=str(column), dtype="categorical", stats={})
+            for column in frame.columns
+        ],
+        row_count=len(frame),
+        label_column=label_column,
+    )
+
+
 def evaluate(
     real_train: pd.DataFrame,
     real_test: pd.DataFrame,
     synth: pd.DataFrame,
     label_column: Optional[str],
+    profile=None,
 ) -> UtilityResult:
     fidelity, per_col = distribution_fidelity(real_train, synth)
     corr_delta = correlation_delta(real_train, synth)
@@ -278,6 +293,12 @@ def evaluate(
         utility_choke_points=choke_points,
         per_column_ks={k: round(v, 4) for k, v in per_col.items()},
     )
+    fairness_report = fairness.audit(
+        profile or _fairness_profile(real_train, label_column),
+        real_train,
+        real_test,
+        synth,
+    )
 
     return UtilityResult(
         fidelity_score=round(fidelity, 4),
@@ -287,4 +308,5 @@ def evaluate(
         utility_ratio=tstr_detail.get("utility_ratio", 0.0),
         tstr_detail=tstr_detail,
         diagnostic_report=diagnostic,
+        fairness=fairness_report,
     )

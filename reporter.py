@@ -95,6 +95,17 @@ def _deterministic_scorecard(final: RoundResult, status: str, t: Thresholds) -> 
         f"  Membership leakage:      {_pct(a.membership_accuracy)}  "
         f"[{ok if a.membership_accuracy <= t.membership_max else bad}] (coin flip = safe)",
         f"  Outlier linkage:         {_pct(a.outlier_linkage_rate)}",
+        f"  Attribute inference:     {_pct(a.attribute_inference_advantage)}  "
+        f"[{ok if a.attribute_inference_advantage <= t.attribute_inference_max else bad}]",
+        f"  Auxiliary linkage:       {_pct(a.linkage_rate)}  "
+        f"[{ok if a.linkage_rate <= t.linkage_max else bad}]",
+        f"  Near-duplicate rate:     {_pct(a.near_duplicate_rate)}  "
+        f"[{ok if a.near_duplicate_rate <= t.near_duplicate_max else bad}]",
+        (
+            f"FAIRNESS: {u.fairness.status}. {u.fairness.summary}"
+            if u.fairness is not None
+            else "FAIRNESS: not assessed"
+        ),
         f"VERDICT: {'USEFUL *AND* SAFE' if status == 'SUCCESS' else 'DID NOT CONVERGE'}",
         "=================================================",
     ]

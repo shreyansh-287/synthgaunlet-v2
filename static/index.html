@@ -699,6 +699,9 @@
           </h4>
           <div id="mReid"></div>
           <div id="mMembership" class="mt-3"></div>
+          <div id="mAttribute" class="mt-3"></div>
+          <div id="mLinkage" class="mt-3"></div>
+          <div id="mNearDuplicate" class="mt-3"></div>
         </div>
       </section>
 
@@ -769,6 +772,15 @@
               <div id="safeCards" class="space-y-3"></div>
             </div>
           </div>
+        </div>
+
+        <div id="fairnessSection" class="hidden bg-slate-900/90 rounded-3xl border border-slate-800 shadow-xl p-6 space-y-3">
+          <div class="flex items-center justify-between gap-3">
+            <h4 class="text-sm font-bold text-slate-100">Fairness and representation</h4>
+            <span id="fairnessBadge" class="px-2.5 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide"></span>
+          </div>
+          <p id="fairnessSummary" class="text-xs text-slate-300"></p>
+          <div id="fairnessCards" class="grid sm:grid-cols-2 gap-3"></div>
         </div>
 
         <!-- Plain-English Verdict Banner -->
@@ -1642,9 +1654,40 @@ function renderHistoryReportModalContent(item, runResult) {
                 ${a.membership_accuracy <= t.membership_max ? 'PASS' : 'FAIL'}
               </span>
             </div>
+            <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+              <div>
+                <div class="text-[11px] text-slate-400 font-semibold">Attribute inference</div>
+                <div class="text-base font-extrabold text-slate-100">${pct(a.attribute_inference_advantage || 0)}</div>
+              </div>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${(a.attribute_inference_advantage || 0) <= (t.attribute_inference_max ?? 0.25) ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'}">
+                ${(a.attribute_inference_advantage || 0) <= (t.attribute_inference_max ?? 0.25) ? 'PASS' : 'FAIL'}
+              </span>
+            </div>
+            <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+              <div>
+                <div class="text-[11px] text-slate-400 font-semibold">Auxiliary linkage</div>
+                <div class="text-base font-extrabold text-slate-100">${pct(a.linkage_rate || 0)}</div>
+              </div>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${(a.linkage_rate || 0) <= (t.linkage_max ?? 0.15) ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'}">
+                ${(a.linkage_rate || 0) <= (t.linkage_max ?? 0.15) ? 'PASS' : 'FAIL'}
+              </span>
+            </div>
+            <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+              <div>
+                <div class="text-[11px] text-slate-400 font-semibold">Near-duplicate rows</div>
+                <div class="text-base font-extrabold text-slate-100">${pct(a.near_duplicate_rate || 0)}</div>
+              </div>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${(a.near_duplicate_rate || 0) <= (t.near_duplicate_max ?? 0.10) ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'}">
+                ${(a.near_duplicate_rate || 0) <= (t.near_duplicate_max ?? 0.10) ? 'PASS' : 'FAIL'}
+              </span>
+            </div>
           </div>
         </div>
       `;
+      const fairness = finalRound.utility && finalRound.utility.fairness;
+      if (fairness) {
+        html += `<p class="text-xs text-slate-300">Fairness ${escapeHtml(fairness.status)}: ${escapeHtml(fairness.summary || '')}</p>`;
+      }
     }
 
     if (runResult.run_id) {
@@ -1792,7 +1835,13 @@ function renderScorecard(resp) {
           ${(a.outlier_exposure || 0.098) <= 0.10 ? 'PASS' : 'FAIL'} (Target ≤ 10.0%)
         </span>
       </div>
+      ${privacyCard('Attribute inference advantage', a.attribute_inference_advantage || 0, t.attribute_inference_max ?? 0.25)}
+      ${privacyCard('Auxiliary linkage', a.linkage_rate || 0, t.linkage_max ?? 0.15)}
+      ${privacyCard('Near-duplicate rows', a.near_duplicate_rate || 0, t.near_duplicate_max ?? 0.10)}
     `;
+    renderFairness(finalRound.utility && finalRound.utility.fairness);
+  } else {
+    renderFairness(null);
   }
 
   el('scorecardText').textContent = resp.scorecard_summary || '';
@@ -2907,12 +2956,57 @@ function bar(label, value, good, threshold, thresholdLabel){
       ${threshold!=null?`<div class="absolute top-0 h-full w-px bg-white/60" style="left:${threshold*100}%" title="${thresholdLabel}"></div>`:''}
     </div>`;
 }
+function privacyCard(label, value, limit){
+  const passed = value <= limit;
+  return `
+    <div class="p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
+      <div>
+        <div class="text-[11px] sm:text-xs text-slate-400 font-bold">${label}</div>
+        <div class="text-base sm:text-lg font-extrabold text-slate-100 mt-0.5">${pct(value)}</div>
+      </div>
+      <span class="self-start sm:self-auto px-2.5 sm:px-3 py-1 text-[10px] sm:text-xs font-bold rounded-full ${passed ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'}">
+        ${passed ? 'PASS' : 'FAIL'} (Target ≤ ${pct(limit)})
+      </span>
+    </div>`;
+}
+
+function renderFairness(report){
+  const section = el('fairnessSection');
+  if(!section) return;
+  if(!report){
+    section.classList.add('hidden');
+    return;
+  }
+  section.classList.remove('hidden');
+  const warn = report.status === 'WARN';
+  const badge = el('fairnessBadge');
+  badge.textContent = report.status || 'PASS';
+  badge.className = warn
+    ? 'px-2.5 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-amber-500/20 text-amber-300 border border-amber-500/40'
+    : 'px-2.5 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wide bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+  el('fairnessSummary').textContent = report.summary || '';
+  const groups = report.groups || [];
+  el('fairnessCards').innerHTML = groups.map(group => `
+    <div class="p-3 rounded-xl bg-slate-950 border border-slate-800">
+      <div class="flex items-center justify-between gap-2">
+        <div class="text-[11px] font-bold text-slate-200">${escapeHtml(group.attribute)} · ${escapeHtml(group.group)}</div>
+        <span class="text-[10px] font-bold ${group.status === 'WARN' ? 'text-amber-300' : 'text-emerald-300'}">${escapeHtml(group.status)}</span>
+      </div>
+      <p class="mt-1 text-[11px] text-slate-400">Real ${pct(group.real_share || 0)} · Synthetic ${pct(group.synth_share || 0)} · Label gap ${pct(group.label_gap || 0)}</p>
+    </div>
+  `).join('');
+}
+
 function updateMetrics(u,a){
-  el('mUtility').innerHTML   = bar('TSTR utility ratio', u.utility_ratio, true, state.thresholds.tstr_min, 'target');
-  el('mFidelity').innerHTML  = bar('Distribution fidelity', u.fidelity_score, true, state.thresholds.fidelity_min, 'min');
-  el('mQuery').innerHTML     = bar('Query equivalence', u.query_equivalence, true, state.thresholds.query_equivalence_min, 'target');
-  el('mReid').innerHTML      = bar('Re-identification', a.re_id_rate, false, state.thresholds.reid_max, 'max allowed');
-  el('mMembership').innerHTML= bar('Membership leakage', a.membership_accuracy, false, state.thresholds.membership_max, 'max allowed');
+  const t = state.thresholds || {};
+  el('mUtility').innerHTML   = bar('TSTR utility ratio', u.utility_ratio, true, t.tstr_min, 'target');
+  el('mFidelity').innerHTML  = bar('Distribution fidelity', u.fidelity_score, true, t.fidelity_min, 'min');
+  el('mQuery').innerHTML     = bar('Query equivalence', u.query_equivalence, true, t.query_equivalence_min, 'target');
+  el('mReid').innerHTML      = bar('Re-identification', a.re_id_rate, false, t.reid_max, 'max allowed');
+  el('mMembership').innerHTML= bar('Membership leakage', a.membership_accuracy, false, t.membership_max, 'max allowed');
+  if(el('mAttribute')) el('mAttribute').innerHTML = bar('Attribute inference', a.attribute_inference_advantage || 0, false, t.attribute_inference_max ?? 0.25, 'max allowed');
+  if(el('mLinkage')) el('mLinkage').innerHTML = bar('Auxiliary linkage', a.linkage_rate || 0, false, t.linkage_max ?? 0.15, 'max allowed');
+  if(el('mNearDuplicate')) el('mNearDuplicate').innerHTML = bar('Near duplicates', a.near_duplicate_rate || 0, false, t.near_duplicate_max ?? 0.10, 'max allowed');
 }
 
 function logLine(agentKey, msg, done){
