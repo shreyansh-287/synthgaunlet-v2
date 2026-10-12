@@ -234,6 +234,20 @@ def register_upload(df: pd.DataFrame, filename: str = "upload.csv") -> Tuple[str
     return upload_id, df, meta
 
 
+def replace_upload(upload_id: str, df: pd.DataFrame) -> Tuple[str, pd.DataFrame, dict]:
+    """Replace a registered upload after PII remediation and re-infer its roles."""
+    entry = _UPLOAD_REGISTRY.get(upload_id)
+    if entry is None:
+        raise KeyError(f"Unknown upload_id '{upload_id}'.")
+    df = _clean_frame(df)
+    filename = entry["meta"].get("source_page", "upload.csv")
+    meta = infer_metadata(df)
+    meta["source_page"] = filename
+    df.to_csv(entry["path"], index=False)
+    entry["meta"] = meta
+    return upload_id, df, meta
+
+
 class UploadCsvDataSource(DataSource):
     """Reads a user-uploaded CSV registered via `register_upload`."""
 

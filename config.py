@@ -49,6 +49,8 @@ class Settings(BaseSettings):
 
     # --- Server ---
     port: int = 8080
+    public_base_url: str = "http://127.0.0.1:8080"
+    cert_signing_key: str = "synthgauntlet-local-cert-key"
 
     @property
     def gemini_configured(self) -> bool:

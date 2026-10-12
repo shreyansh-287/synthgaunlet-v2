@@ -25,19 +25,22 @@ from pathlib import Path
 from typing import Any, List, Optional
 
 import pandas as pd
-from fastapi import FastAPI, File, Header, HTTPException, Query, UploadFile
+from fastapi import FastAPI, File, Form, Header, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.responses import JSONResponse
 
+import certificate
 import llm
 import bigquery_client as bq
+import pii_scanner
+from ingest import IngestError, load_tabular
 from agents import policy
 from agents.adk_agents import adk_available
 from history_store import HistoryItem, list_history, save_history, clear_history, delete_history_item
 from config import get_settings
-from data_source import get_data_source, list_datasets, register_upload
+from data_source import get_data_source, list_datasets, register_upload, replace_upload
 from models import ForgeRequest, ForgeResponse, RunStartResponse, RunStatusResponse, SourceSpec, Thresholds
 from pipeline import (
     abort_run,
@@ -474,14 +477,61 @@ def get_run_for_history(history_id: str):
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+def _upload_payload(upload_id: str, filename: Optional[str], clean_df: pd.DataFrame, meta: dict, warnings: List[str]) -> dict:
+    findings = pii_scanner.scan(clean_df)
+    preview = _safe_preview(clean_df, 5)
+    sensitive = {item["column"] for item in findings}
+    for row in preview:
+        for column in sensitive:
+            if row.get(column):
+                row[column] = "[redacted]"
+    return {
+        "upload_id": upload_id,
+        "filename": filename,
+        "rows": int(len(clean_df)),
+        "columns": [str(c) for c in clean_df.columns],
+        "numeric_columns": [str(c) for c in clean_df.select_dtypes("number").columns],
+        "quasi_identifiers": [str(c) for c in meta.get("quasi_identifiers", [])],
+        "sensitive_columns": [str(c) for c in meta.get("sensitive_columns", [])],
+        "label_column": str(meta["label_column"]) if meta.get("label_column") is not None else None,
+        "preview": preview,
+        "warnings": warnings,
+        "pii_findings": findings,
+    }
+
+
+def _reject_small_upload(clean_df: pd.DataFrame) -> None:
+    raw_rows = int(len(clean_df))
+    raw_cols = int(clean_df.shape[1])
+    if raw_rows < MIN_UPLOAD_ROWS or raw_cols < 2:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Dataset has only {raw_rows} row(s) and {raw_cols} column(s). Need at least {MIN_UPLOAD_ROWS} rows and 2 columns for synthesis & evaluation.",
+        )
+
+
 @app.post("/upload")
 @app.post("/api/v1/upload")
-async def upload(file: UploadFile = File(...)):
-    """Accept an arbitrary CSV, clean it, and auto-detect column roles.
+async def upload(file: UploadFile = File(...), sheet_name: Optional[str] = Form(None)):
+    """Accept a table, clean it, and auto-detect column roles.
 
     Returns an upload_id plus the inferred label / quasi-identifiers so the UI
     can let the user confirm or adjust before forging."""
+    if not isinstance(sheet_name, str) or not sheet_name.strip():
+        sheet_name = None
     fname = (file.filename or "").lower()
+    suffix = ".jsonl" if fname.endswith(".jsonl") else Path(fname).suffix
+    if suffix in {".tsv", ".xlsx", ".xls", ".json", ".jsonl", ".parquet"}:
+        raw = await file.read()
+        if len(raw) > MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="File too large (max 15 MB).")
+        try:
+            frame, warnings = load_tabular(raw, fname, sheet_name)
+        except IngestError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        upload_id, clean_df, meta = register_upload(frame, filename=file.filename or "upload.csv")
+        _reject_small_upload(clean_df)
+        return _upload_payload(upload_id, file.filename, clean_df, meta, warnings)
     valid_csv_content_types = (
         "text/csv",
         "text/plain",
@@ -574,17 +624,7 @@ async def upload(file: UploadFile = File(...)):
             detail=f"Only {raw_cols} usable column detected ({col_name}). Please ensure your CSV has at least 2 columns separated by commas, semicolons, or tabs.",
         )
 
-    return {
-        "upload_id": upload_id,
-        "filename": file.filename,
-        "rows": int(len(clean_df)),
-        "columns": [str(c) for c in clean_df.columns],
-        "numeric_columns": [str(c) for c in clean_df.select_dtypes("number").columns],
-        "quasi_identifiers": [str(c) for c in meta.get("quasi_identifiers", [])],
-        "sensitive_columns": [str(c) for c in meta.get("sensitive_columns", [])],
-        "label_column": str(meta["label_column"]) if meta.get("label_column") is not None else None,
-        "preview": _safe_preview(clean_df, 5),
-    }
+    return _upload_payload(upload_id, file.filename, clean_df, meta, [])
 
 
 @app.post("/api/v1/forge", response_model=ForgeResponse)
@@ -599,6 +639,43 @@ def forge(req: ForgeRequest):
 
 class AbortRequest(BaseModel):
     run_id: str
+
+
+class PiiAction(BaseModel):
+    column: str
+    action: str
+
+
+class PiiApplyRequest(BaseModel):
+    upload_id: str
+    actions: List[PiiAction]
+
+
+@app.post("/api/v1/scan-pii")
+def scan_pii(upload_id: str):
+    try:
+        frame = get_data_source(SourceSpec(type="upload", upload_id=upload_id)).load(
+            SourceSpec(type="upload", upload_id=upload_id)
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    return {"upload_id": upload_id, "findings": pii_scanner.scan(frame)}
+
+
+@app.post("/api/v1/apply-pii")
+def apply_pii(body: PiiApplyRequest):
+    spec = SourceSpec(type="upload", upload_id=body.upload_id)
+    try:
+        frame = get_data_source(spec).load(spec)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    updated = pii_scanner.apply(frame, [item.model_dump() for item in body.actions])
+    try:
+        upload_id, clean_df, meta = replace_upload(body.upload_id, updated)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    _reject_small_upload(clean_df)
+    return _upload_payload(upload_id, meta.get("source_page"), clean_df, meta, [])
 
 
 @app.post("/api/v1/forge/abort")
@@ -781,6 +858,54 @@ def set_active_candidate(run_id: str, body: ActiveCandidateRequest):
     if frame is None:
         raise HTTPException(status_code=404, detail="That candidate did not pass the release gate.")
     return {"run_id": run_id, "candidate_id": body.candidate_id, "rows": int(len(frame))}
+
+
+def _require_certificate(run_id: str) -> dict:
+    blocked = _uncertified_download_detail(run_id)
+    if blocked:
+        raise HTTPException(status_code=403, detail=blocked)
+    stored = certificate.load_certificate(run_id)
+    if stored is None:
+        raise HTTPException(status_code=404, detail="No certificate was issued for this run.")
+    return stored
+
+
+@app.get("/api/v1/certificate/{run_id}")
+def certificate_json(run_id: str):
+    return _require_certificate(run_id)
+
+
+@app.get("/api/v1/certificate/{run_id}/pdf")
+def certificate_pdf(run_id: str):
+    _require_certificate(run_id)
+    path = certificate.certificate_pdf(run_id)
+    if path is None:
+        raise HTTPException(status_code=404, detail="No certificate was issued for this run.")
+    return FileResponse(path, media_type="application/pdf", filename=f"certificate_{run_id}.pdf")
+
+
+@app.get("/api/v1/verify/{run_id}")
+def certificate_lookup(run_id: str):
+    return _require_certificate(run_id)
+
+
+@app.post("/api/v1/verify")
+async def verify_certificate(
+    file: UploadFile = File(...),
+    certificate_json: Optional[str] = Form(None),
+    certificate_file: Optional[UploadFile] = File(None),
+):
+    if certificate_file is not None:
+        raw_certificate = await certificate_file.read()
+    elif isinstance(certificate_json, str) and certificate_json.strip():
+        raw_certificate = certificate_json.encode("utf-8")
+    else:
+        raise HTTPException(status_code=400, detail="Upload the certificate PDF, or provide certificate_json.")
+    try:
+        stored = certificate.load_certificate_document(raw_certificate)
+    except (json.JSONDecodeError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return certificate.verify(await file.read(), stored)
 
 
 @app.get("/api/v1/export/{run_id}")

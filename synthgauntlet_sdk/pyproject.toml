@@ -1,0 +1,9 @@
+[project]
+name = "synthgauntlet-sdk"
+version = "0.1.0"
+description = "Client and MCP tools for SynthGauntlet synthesis, scorecards, and certificate checks."
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+synthgauntlet-mcp = "mcp_server:main"

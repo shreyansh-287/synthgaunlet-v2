@@ -20,6 +20,7 @@ from typing import Callable, Dict, List, Optional
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
+import certificate
 import llm
 import reporter
 from agents import attacker, dp_engine, generator, orchestrator, profiler, statistician
@@ -802,5 +803,10 @@ def run_forge(
         policy_source=req.policy_source,
         policy_explanation=req.policy_explanation,
     )
+    if passed and synth is not None:
+        try:
+            certificate.issue(run_id, response.model_dump(), synth, real_train)
+        except Exception:
+            logger.exception("Could not issue the release certificate for %s", run_id)
     emit({"type": "done", "response": response.model_dump()})
     return response

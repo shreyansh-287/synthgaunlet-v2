@@ -224,15 +224,15 @@
 
           <!-- Action Row 1: Upload CSV -->
           <div id="mobileCsvContainer" class="space-y-2">
-            <input id="mobileFileInput" type="file" accept=".csv,text/csv,text/plain,application/vnd.ms-excel,text/comma-separated-values,application/csv,application/octet-stream" class="hidden" />
+            <input id="mobileFileInput" type="file" accept=".csv,.tsv,.xlsx,.json,.jsonl,.parquet,text/csv,text/plain,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/comma-separated-values,application/csv,application/octet-stream" class="hidden" />
             <label id="mobileCsvCard" for="mobileFileInput" class="p-3.5 rounded-2xl bg-slate-900/80 hover:bg-slate-900 border border-slate-800/80 hover:border-indigo-500/50 shadow-md backdrop-blur-xl flex items-center justify-between gap-3 cursor-pointer transition active:scale-[0.98] group block">
               <div class="flex items-center gap-3 min-w-0">
                 <div class="h-10 w-10 rounded-xl bg-indigo-500/15 text-indigo-400 grid place-items-center border border-indigo-500/30 text-lg shrink-0 group-hover:scale-105 transition-transform">
                   <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
                 </div>
                 <div class="min-w-0">
-                  <h4 class="font-extrabold text-xs text-slate-100 leading-tight">Upload CSV</h4>
-                  <p class="text-[10px] text-slate-400 mt-0.5 truncate">Tap to browse CSV from device</p>
+                  <h4 class="font-extrabold text-xs text-slate-100 leading-tight">Upload table</h4>
+                  <p class="text-[10px] text-slate-400 mt-0.5 truncate">CSV, TSV, Excel, JSON, or Parquet</p>
                 </div>
               </div>
               <div class="h-7 w-7 rounded-full bg-slate-800/80 group-hover:bg-indigo-600/30 text-slate-400 group-hover:text-white grid place-items-center shrink-0 border border-slate-700/80 transition">
@@ -372,13 +372,13 @@
               <div class="h-12 w-12 rounded-2xl bg-indigo-500/10 text-indigo-400 grid place-items-center border border-indigo-500/20 group-hover:scale-105 transition-transform">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
               </div>
-              <h4 class="font-bold text-slate-100 text-base">Upload CSV</h4>
-              <p class="text-xs text-slate-400 leading-relaxed">Drag & drop your CSV file or browse from device</p>
+              <h4 class="font-bold text-slate-100 text-base">Upload table</h4>
+              <p class="text-xs text-slate-400 leading-relaxed">Drag and drop CSV, TSV, Excel, JSON, or Parquet</p>
             </div>
             <div id="csvUploadArea" class="mt-6 w-full">
               <label id="csvUploadLabel" class="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 cursor-pointer transition font-bold text-xs text-white shadow-lg shadow-indigo-600/30">
-                <span>📂</span> Upload CSV
-                <input id="fileInput" type="file" accept=".csv,text/csv,text/plain,application/vnd.ms-excel,text/comma-separated-values,application/csv,application/octet-stream" class="hidden" />
+                <span>📂</span> Upload table
+                <input id="fileInput" type="file" accept=".csv,.tsv,.xlsx,.json,.jsonl,.parquet,text/csv,text/plain,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/comma-separated-values,application/csv,application/octet-stream" class="hidden" />
               </label>
             </div>
           </div>
@@ -829,12 +829,12 @@
           </div>
           <div class="grid md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-800">
             <!-- Utility Panel -->
-            <div class="p-6 space-y-3">
-              <div class="flex items-center justify-between mb-1">
+            <div class="p-6 flex flex-col h-full">
+              <div class="flex items-center justify-between mb-1 shrink-0">
                 <span class="font-bold text-emerald-400 text-xs uppercase tracking-wider">📏 Useful (Fidelity & Utility)</span>
                 <span class="text-[10px] text-slate-500 font-medium">Proven by Math</span>
               </div>
-              <div id="usefulCards" class="space-y-3"></div>
+              <div id="usefulCards" class="mt-3 flex flex-1 flex-col gap-3"></div>
             </div>
             <!-- Privacy Panel -->
             <div class="p-6 space-y-3">
@@ -885,6 +885,14 @@
                  class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 hover:border-blue-400 text-blue-300 hover:text-white font-bold text-xs shadow-sm transition transform hover:-translate-y-0.5 text-center cursor-pointer">
                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 7v10c0 2.21 3.58 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.58 4 8 4s8-1.79 8-4M4 7c0-2.21 3.58-4 8-4s8 1.79 8 4m0 5c0 2.21-3.58 4-8 4s-8-1.79-8-4"/></svg>
                 <span>Export to BigQuery</span>
+              </button>
+              <a id="certificatePdfBtn" href="#" download
+                 class="hidden w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 hover:border-indigo-400 text-indigo-200 hover:text-white font-bold text-xs shadow-sm transition text-center">
+                <span>Download certificate</span>
+              </a>
+              <button id="verifyCertificateBtn" type="button" onclick="openVerifyModal()"
+                 class="hidden w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/80 hover:border-slate-600 text-slate-300 hover:text-slate-100 font-semibold text-xs transition text-center cursor-pointer">
+                <span>Check certificate</span>
               </button>
               <button id="newAnalysisBtn" onclick="startNewAnalysis()"
                  class="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/80 hover:border-slate-600 text-slate-400 hover:text-slate-200 font-semibold text-xs transition text-center cursor-pointer">
@@ -978,6 +986,50 @@
     </div>
   </div>
 
+  <div id="piiModal" onclick="if(event.target===this) closePiiModal()" class="fixed inset-0 top-0 left-0 right-0 bottom-0 w-screen h-screen z-[9999] flex items-center justify-center bg-slate-950/80 backdrop-blur-md hidden fade-in p-3 sm:p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-5 sm:p-6 max-w-lg w-full shadow-2xl space-y-4 modal-card max-h-[88vh] flex flex-col">
+      <div class="flex items-center justify-between gap-3 border-b border-slate-800 pb-3.5">
+        <div class="min-w-0">
+          <h3 class="text-sm sm:text-base font-extrabold text-slate-100 leading-tight">Sensitive values found</h3>
+          <p class="text-[11px] sm:text-xs text-slate-400 font-medium">Choose a remediation before column setup. Examples are redacted.</p>
+        </div>
+        <button onclick="closePiiModal()" type="button" class="h-8 w-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white grid place-items-center text-sm font-bold shrink-0">✕</button>
+      </div>
+      <div id="piiFindings" class="space-y-2 overflow-y-auto pr-1"></div>
+      <div class="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-800">
+        <button type="button" onclick="skipPii()" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-semibold text-xs">Continue unchanged</button>
+        <button type="button" onclick="applyPii()" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs">Apply remediation</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="verifyModal" onclick="if(event.target===this) closeVerifyModal()" class="fixed inset-0 top-0 left-0 right-0 bottom-0 w-screen h-screen z-[9999] flex items-center justify-center bg-slate-950/80 backdrop-blur-md hidden fade-in p-3 sm:p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-5 sm:p-6 max-w-lg w-full shadow-2xl space-y-4 modal-card">
+      <div class="flex items-center justify-between gap-3 border-b border-slate-800 pb-3.5">
+        <div class="min-w-0">
+          <h3 class="text-sm sm:text-base font-extrabold text-slate-100 leading-tight">Check a certificate</h3>
+          <p class="text-[11px] sm:text-xs text-slate-400 font-medium">Compare the synthetic CSV with the certificate PDF you downloaded</p>
+        </div>
+        <button onclick="closeVerifyModal()" type="button" class="h-8 w-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white grid place-items-center text-sm font-bold shrink-0">✕</button>
+      </div>
+      <div class="space-y-3 text-xs text-slate-300">
+        <label class="block space-y-1.5">
+          <span class="font-bold text-slate-200">Synthetic CSV</span>
+          <input id="verifyCsv" type="file" accept=".csv,text/csv" class="w-full text-xs text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-800 file:px-3 file:py-2 file:text-slate-200" />
+        </label>
+        <label class="block space-y-1.5">
+          <span class="font-bold text-slate-200">Certificate PDF</span>
+          <input id="verifyJson" type="file" accept=".pdf,application/pdf,.json,application/json" class="w-full text-xs text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-800 file:px-3 file:py-2 file:text-slate-200" />
+          <span class="text-[10px] text-slate-500">Use the file from Download certificate.</span>
+        </label>
+        <div id="verifyResult" class="hidden p-3.5 rounded-xl border text-xs"></div>
+      </div>
+      <div class="flex items-center justify-end pt-2 border-t border-slate-800">
+        <button type="button" onclick="submitVerify()" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs">Verify</button>
+      </div>
+    </div>
+  </div>
+
   <!-- BigQuery Export Modal -->
   <div id="bqExportModal" onclick="if(event.target===this) closeBqExportModal()" class="fixed inset-0 top-0 left-0 right-0 bottom-0 w-screen h-screen z-[9999] flex items-center justify-center bg-slate-950/80 backdrop-blur-md hidden fade-in p-3 sm:p-4">
     <div class="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-5 sm:p-6 max-w-lg w-full shadow-2xl space-y-4 sm:space-y-5 modal-card">
@@ -1064,7 +1116,7 @@
             <h4 class="font-extrabold text-indigo-300 text-sm flex items-center gap-2">
               <span>🛡️</span> Privacy Boundary & Security Guarantees
             </h4>
-            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-200 border border-indigo-500/40">Enterprise Compliance</span>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-200 border border-indigo-500/40">Technical Controls</span>
           </div>
           <p class="leading-relaxed text-slate-300 text-[11px]">
             • <strong>Zero Raw Row Transmission</strong>: Sensitive raw records are <em>NEVER</em> passed to any LLM prompt. Only anonymized statistical aggregates, column marginals, covariance matrices, and diagnostic deltas reach Gemini.<br>
@@ -1078,10 +1130,12 @@
             <span>🚀</span> How to Use SynthGauntlet
           </h4>
           <ol class="list-decimal list-inside space-y-1.5 leading-relaxed text-slate-300 text-[11px]">
-            <li><strong>Import Data</strong>: Upload any CSV file (up to 50,000 rows / 15 MB), connect a Google BigQuery table (from 350+ public or private datasets), or pick a pre-loaded benchmark sample.</li>
-            <li><strong>Inspect & Configure Columns</strong>: The Semantic Profiler automatically infers functional dependencies, business constraints, Quasi-Identifiers (the attack surface), and the target Label column. Tweak selections if needed.</li>
-            <li><strong>Forge & Attack</strong>: Click <em>Forge Synthetic Data</em> to launch the multi-agent adversarial gauntlet. Watch live rounds as agents explore multi-candidate Pareto strategies.</li>
-            <li><strong>Download & Export</strong>: Once Arbiter approves release, download your synthetic CSV or export directly to a Google BigQuery table with 1-click.</li>
+            <li><strong>Import Data</strong>: Upload CSV, TSV, XLSX, JSON, JSONL, or Parquet (up to 50,000 rows / 15 MB), connect BigQuery, or select a benchmark sample. Delimiters and nested JSON objects are normalized automatically.</li>
+            <li><strong>Remediate PII</strong>: If the deterministic pre-scan finds likely direct identifiers, choose Mask, Drop, Salted Hash, or seeded synthetic replacement before profiling.</li>
+            <li><strong>Inspect & Configure Columns</strong>: Confirm the inferred label, quasi-identifiers, output row count, synthesis engine, and release policy.</li>
+            <li><strong>Forge & Attack</strong>: Launch the adversarial loop and watch Forge, Auditor, Challenger, and Arbiter evaluate multiple candidates over successive rounds.</li>
+            <li><strong>Review the Scorecard</strong>: Inspect every utility and privacy gate, the Pareto frontier, differential-privacy statement, policy used, and fairness warnings.</li>
+            <li><strong>Release & Verify</strong>: A certified run enables CSV and certificate downloads plus BigQuery export. Use <em>Check certificate</em> with the CSV and certificate PDF to detect any later change.</li>
           </ol>
         </div>
 
@@ -1113,14 +1167,14 @@
                 <p class="font-bold text-rose-400 text-xs">🕵️ Challenger (Privacy Attacker)</p>
                 <span class="text-[9px] font-mono text-rose-300/70 bg-rose-500/10 px-1.5 py-0.5 rounded">Adversary</span>
               </div>
-              <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">Executes an <strong>Adaptive Multi-Pass Tool Loop</strong> (Pass 1 broad attack surface, Pass 2 focused adaptive follow-up) probing nearest-neighbor DCR linkage, shadow Membership Inference (MIA), and outlier attacks.</p>
+              <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">Executes an <strong>Adaptive Multi-Pass Tool Loop</strong> probing nearest-neighbor re-identification, shadow Membership Inference (MIA), outlier exposure, attribute inference, auxiliary linkage, and near-duplicate rows.</p>
             </div>
             <div class="p-3.5 rounded-2xl bg-slate-950/50 border border-amber-500/20 hover:border-amber-500/40 transition">
               <div class="flex items-center justify-between">
                 <p class="font-bold text-amber-400 text-xs">⚖️ Arbiter (Orchestrator)</p>
                 <span class="text-[9px] font-mono text-amber-300/70 bg-amber-500/10 px-1.5 py-0.5 rounded">Judge</span>
               </div>
-              <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">Enforces mathematical release gates and <strong>Pareto candidate selection</strong>. Tracks multi-round state via a <code>RunBlackboard</code> to diagnose root causes and advise Forge, driving convergence within 5 rounds.</p>
+              <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">Enforces mathematical release gates and <strong>Pareto candidate selection</strong>. Tracks multi-round state via a <code>RunBlackboard</code>, selects only gate-passing files for release, and can invoke deterministic Auto-Heal after ordinary rounds fail.</p>
             </div>
           </div>
         </div>
@@ -1134,7 +1188,7 @@
             <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">Dual-Scorecard Thresholds</span>
           </div>
           <p class="text-slate-400 text-[11px] leading-relaxed">
-            Data is only approved for release if it simultaneously passes all strict utility benchmarks AND satisfies rigorous privacy ceilings:
+            Data is approved only when it simultaneously passes every utility floor and privacy ceiling in the selected policy. The values below are Balanced defaults; Privacy first, Analytics first, or an interpreted custom policy changes the displayed thresholds:
           </p>
           <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-[10px] font-mono">
             <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
@@ -1179,6 +1233,27 @@
               </div>
               <span class="text-emerald-400 font-bold text-sm mt-2">≤ 10.0%</span>
             </div>
+            <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
+              <div>
+                <span class="text-slate-400 block font-sans font-bold text-xs">Attribute Inference</span>
+                <span class="text-[9px] text-slate-500">Sensitive-value Advantage</span>
+              </div>
+              <span class="text-emerald-400 font-bold text-sm mt-2">≤ 25.0%</span>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
+              <div>
+                <span class="text-slate-400 block font-sans font-bold text-xs">Auxiliary Linkage</span>
+                <span class="text-[9px] text-slate-500">External Key Matching</span>
+              </div>
+              <span class="text-emerald-400 font-bold text-sm mt-2">≤ 15.0%</span>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
+              <div>
+                <span class="text-slate-400 block font-sans font-bold text-xs">Near-Duplicate Rows</span>
+                <span class="text-[9px] text-slate-500">Whole-Row Similarity</span>
+              </div>
+              <span class="text-emerald-400 font-bold text-sm mt-2">≤ 10.0%</span>
+            </div>
           </div>
         </div>
 
@@ -1204,8 +1279,106 @@
               <p class="text-slate-400 mt-1 leading-relaxed">Resamples categorical values from conditional marginals and clamps rare categories (<1% frequency) to prevent unique fingerprinting.</p>
             </div>
             <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
-              <span class="font-bold text-emerald-300">🔒 Guaranteed Convergence Fallback:</span>
-              <p class="text-slate-400 mt-1 leading-relaxed">If Vertex AI encounters quota limits or timeouts, the deterministic rule engine automatically takes over, guaranteeing forward progress across rounds.</p>
+              <span class="font-bold text-emerald-300">🔒 Deterministic Fallback:</span>
+              <p class="text-slate-400 mt-1 leading-relaxed">If Gemini is unavailable or times out, the deterministic planner continues the bounded round sequence. Certification still requires every configured release gate to pass.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Multi-format ingestion and PII -->
+        <div class="bg-slate-950/60 p-4 sm:p-5 rounded-2xl border border-slate-800/80 space-y-3">
+          <div class="flex items-center justify-between gap-3">
+            <h4 class="font-extrabold text-cyan-300 text-sm flex items-center gap-2">
+              <span>📂</span> Multi-Format Upload & PII Pre-Gate
+            </h4>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">Before Profiling</span>
+          </div>
+          <div class="grid sm:grid-cols-2 gap-2.5 text-[11px]">
+            <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+              <p class="font-bold text-cyan-300">Supported files</p>
+              <p class="text-slate-400 mt-1 leading-relaxed"><strong class="text-slate-200">CSV / TSV</strong> with delimiter detection, <strong class="text-slate-200">XLSX</strong> with sheet selection, <strong class="text-slate-200">JSON / JSONL</strong> with nested-key flattening, and <strong class="text-slate-200">Parquet</strong>. Nested lists become comma-separated text with a warning. Legacy XLS files should be saved as XLSX.</p>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+              <p class="font-bold text-amber-300">Deterministic PII detection</p>
+              <p class="text-slate-400 mt-1 leading-relaxed">Scans for email, phone, SSN, IP address, URL, Luhn-valid payment-card patterns, sensitive column names, and highly unique ID-like columns. Examples shown in the modal are redacted.</p>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800 sm:col-span-2">
+              <p class="font-bold text-emerald-300">Available remediation</p>
+              <p class="text-slate-400 mt-1 leading-relaxed"><strong class="text-slate-200">Mask</strong> replaces values with a redaction marker; <strong class="text-slate-200">Drop</strong> removes the column; <strong class="text-slate-200">Salted Hash</strong> creates stable one-way tokens; and <strong class="text-slate-200">Synthetic Replacement</strong> uses seeded Faker values independent of the originals. Remediation happens locally before semantic profiling or synthesis.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- DP, Auto-Heal, Pareto, policy, fairness -->
+        <div class="space-y-3">
+          <h4 class="font-extrabold text-slate-100 text-sm flex items-center gap-2">
+            <span>🧭</span> Synthesis, Rescue & Decision Support
+          </h4>
+          <div class="grid sm:grid-cols-2 gap-3">
+            <div class="p-3.5 rounded-2xl bg-slate-950/50 border border-sky-500/20">
+              <p class="font-bold text-sky-300 text-xs">Differential Privacy Engine</p>
+              <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">Choose <strong>Laplace DP</strong> to split an epsilon budget across one-way and selected two-way marginal queries. Smaller epsilon adds more noise. The scorecard states a formal epsilon guarantee only when the released table remains on the pure DP path; a hybrid or Auto-Heal replacement displays <em>No formal DP guarantee</em>.</p>
+            </div>
+            <div class="p-3.5 rounded-2xl bg-slate-950/50 border border-emerald-500/20">
+              <p class="font-bold text-emerald-300 text-xs">Auto-Heal Rescue</p>
+              <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">If all ordinary rounds miss the gate, Auto-Heal applies targeted deterministic repair strategies and re-runs the full Auditor, Challenger, and Arbiter checks. A repaired file becomes downloadable only after it passes every gate and is labeled <strong>CERTIFIED_AFTER_RESCUE</strong>.</p>
+            </div>
+            <div class="p-3.5 rounded-2xl bg-slate-950/50 border border-violet-500/20">
+              <p class="font-bold text-violet-300 text-xs">Pareto Privacy–Utility Frontier</p>
+              <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">Every candidate from the current run is plotted by utility score and normalized privacy risk. The connecting line marks non-dominated candidates. Drag the slider or select a point to inspect it; download remains attached to a candidate that passed the release gate.</p>
+            </div>
+            <div class="p-3.5 rounded-2xl bg-slate-950/50 border border-indigo-500/20">
+              <p class="font-bold text-indigo-300 text-xs">Release Policy Controls</p>
+              <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">Use <strong>Privacy first</strong>, <strong>Balanced</strong>, or <strong>Analytics first</strong>, or describe a custom priority. Only policy text is sent for interpretation—never source rows. The resulting numeric thresholds are displayed, validated, and enforced by deterministic code.</p>
+            </div>
+            <div class="p-3.5 rounded-2xl bg-slate-950/50 border border-amber-500/20 sm:col-span-2">
+              <p class="font-bold text-amber-300 text-xs">Fairness & Representation Advisory</p>
+              <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">The scorecard compares representation and outcome behavior for detected groups and reports warnings when disparities merit review. Fairness is an advisory signal: it does not override the deterministic privacy-and-utility release gate and does not independently block download.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Signed certificate -->
+        <div class="bg-slate-950/60 p-4 sm:p-5 rounded-2xl border border-slate-800/80 space-y-3">
+          <div class="flex items-center justify-between gap-3">
+            <h4 class="font-extrabold text-indigo-300 text-sm flex items-center gap-2">
+              <span>📜</span> Signed Certificate & Tamper Verification
+            </h4>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/30">Certified Runs Only</span>
+          </div>
+          <div class="grid sm:grid-cols-3 gap-2.5 text-[11px]">
+            <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+              <p class="font-bold text-slate-200">1. Evidence record</p>
+              <p class="text-slate-400 mt-1 leading-relaxed">The branded two-page PDF records the run, policy, DP statement, row counts, every gate result, synthesis and attack method, SHA-256 fingerprints, and issue time.</p>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+              <p class="font-bold text-slate-200">2. Digital sealing</p>
+              <p class="text-slate-400 mt-1 leading-relaxed">The synthetic CSV is fingerprinted with SHA-256. The canonical certificate record is signed with HMAC-SHA256 and embedded inside the PDF alongside a verification QR code.</p>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+              <p class="font-bold text-slate-200">3. Check certificate</p>
+              <p class="text-slate-400 mt-1 leading-relaxed">Upload the downloaded CSV and certificate PDF. <strong class="text-emerald-300">VALID</strong> means both signature and fingerprint match; <strong class="text-rose-300">TAMPERED</strong> means a certificate field or CSV byte changed.</p>
+            </div>
+          </div>
+          <p class="text-[10px] leading-relaxed text-slate-500">The certificate supplies technical evidence for the tested file. It does not constitute legal HIPAA, GDPR, or regulatory certification. Re-saving a CSV can change its byte-level fingerprint even when displayed values appear unchanged.</p>
+        </div>
+
+        <!-- SDK and MCP -->
+        <div class="bg-slate-950/60 p-4 sm:p-5 rounded-2xl border border-slate-800/80 space-y-3">
+          <div class="flex items-center justify-between gap-3">
+            <h4 class="font-extrabold text-purple-300 text-sm flex items-center gap-2">
+              <span>🧩</span> Python SDK & MCP Tools
+            </h4>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/30">Automation</span>
+          </div>
+          <div class="grid sm:grid-cols-2 gap-2.5 text-[11px]">
+            <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+              <p class="font-bold text-purple-300">Python client</p>
+              <p class="text-slate-400 mt-1 leading-relaxed"><code class="text-purple-200">SynthGauntletClient</code> provides upload, synchronous forge, scorecard retrieval, certified download, and certificate verification against the existing API.</p>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+              <p class="font-bold text-purple-300">FastMCP server</p>
+              <p class="text-slate-400 mt-1 leading-relaxed">Tools include <code class="text-purple-200">synthgauntlet_start_synthesis</code>, <code class="text-purple-200">synthgauntlet_get_scorecard</code>, and <code class="text-purple-200">synthgauntlet_verify_certificate</code>. Tool responses expose status and metric summaries, never raw rows.</p>
             </div>
           </div>
         </div>
@@ -1248,7 +1421,7 @@
           <div class="grid sm:grid-cols-2 gap-2.5 text-[11px]">
             <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
               <span class="font-bold text-slate-200">📂 Source Data Ingestion (Input):</span>
-              <p class="text-slate-400 mt-0.5">Supports CSV uploads up to <strong class="text-slate-200">50,000 rows / 15 MB</strong> and BigQuery sample imports up to <strong class="text-slate-200">10,000 rows</strong> (min. 50 source rows recommended for statistical correlation fidelity).</p>
+              <p class="text-slate-400 mt-0.5">Supports CSV, TSV, XLSX, JSON, JSONL, and Parquet uploads up to <strong class="text-slate-200">50,000 rows / 15 MB</strong> and BigQuery sample imports up to <strong class="text-slate-200">10,000 rows</strong>.</p>
             </div>
             <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
               <span class="font-bold text-indigo-300">✨ Rows to Forge (Output):</span>
@@ -1256,11 +1429,11 @@
             </div>
             <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
               <span class="font-bold text-amber-300">🔄 Adversarial Pass Cap:</span>
-              <p class="text-slate-400 mt-0.5"><strong class="text-amber-300">5 Rounds Maximum</strong> with multi-candidate Pareto beam search to guarantee high-rate convergence.</p>
+              <p class="text-slate-400 mt-0.5">Up to <strong class="text-amber-300">5 configured rounds</strong> with multi-candidate Pareto beam search, followed by optional Auto-Heal rescue attempts. A run may finish uncertified.</p>
             </div>
             <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
               <span class="font-bold text-emerald-300">🔒 Privacy Defense:</span>
-              <p class="text-slate-400 mt-0.5">Automated nearest-neighbor DCR re-ID defense, shadow membership inference mitigation, and outlier linkage suppression.</p>
+              <p class="text-slate-400 mt-0.5">Automated re-identification, membership, outlier, attribute-inference, auxiliary-linkage, and near-duplicate defenses. Failed certification hides CSV, BigQuery, and certificate hand-off.</p>
             </div>
           </div>
         </div>
@@ -1885,6 +2058,14 @@ function renderHistoryReportModalContent(item, runResult) {
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 7v10c0 2.21 3.58 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.58 4 8 4s8-1.79 8-4M4 7c0-2.21 3.58-4 8-4s8 1.79 8 4m0 5c0 2.21-3.58 4-8 4s-8-1.79-8-4"/></svg>
               Export to BigQuery
             </button>
+            <a href="/api/v1/certificate/${runResult.run_id}/pdf" download
+               class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs shadow-lg shadow-indigo-600/30 transition text-center">
+              Download certificate
+            </a>
+            <button onclick="openVerifyModal()" type="button"
+               class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs transition text-center cursor-pointer">
+              Check certificate
+            </button>
           </div>
         `;
       }
@@ -1932,6 +2113,13 @@ function renderScorecard(resp) {
     downloadBtn.classList.remove('hidden');
     if (exportBtn) exportBtn.classList.remove('hidden');
     if (blocked) blocked.classList.add('hidden');
+    const certBtn = el('certificatePdfBtn');
+    const verifyBtn = el('verifyCertificateBtn');
+    if (certBtn) {
+      certBtn.href = `/api/v1/certificate/${resp.run_id}/pdf`;
+      certBtn.classList.remove('hidden');
+    }
+    if (verifyBtn) verifyBtn.classList.remove('hidden');
   } else {
     banner.className   = 'rounded-3xl p-6 border shadow-2xl bg-rose-500/10 border-rose-500/40';
     icon.textContent   = '🛑';
@@ -1942,6 +2130,8 @@ function renderScorecard(resp) {
     downloadBtn.removeAttribute('href');
     downloadBtn.classList.add('hidden');
     if (exportBtn) exportBtn.classList.add('hidden');
+    el('certificatePdfBtn')?.classList.add('hidden');
+    el('verifyCertificateBtn')?.classList.add('hidden');
     if (blocked) {
       blocked.classList.remove('hidden');
       el('downloadBlockedReasons').innerHTML = releaseFailureReasons(resp)
@@ -1972,7 +2162,7 @@ function renderScorecard(resp) {
 function fillMetricCards(u, a, t) {
   if (!u || !a) return;
   el('usefulCards').innerHTML = `
-      <div class="p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
+      <div class="flex-1 p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
         <div>
           <div class="text-[11px] sm:text-xs text-slate-400 font-bold">Distribution Fidelity</div>
           <div class="text-base sm:text-lg font-extrabold text-slate-100 mt-0.5">${pct(u.fidelity_score)}</div>
@@ -1981,7 +2171,7 @@ function fillMetricCards(u, a, t) {
           ${u.fidelity_score >= t.fidelity_min ? 'PASS' : 'FAIL'} (Target ≥ ${pct(t.fidelity_min)})
         </span>
       </div>
-      <div class="p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
+      <div class="flex-1 p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
         <div>
           <div class="text-[11px] sm:text-xs text-slate-400 font-bold">Utility Ratio (TSTR ML Benchmark)</div>
           <div class="text-base sm:text-lg font-extrabold text-slate-100 mt-0.5">${pct(u.utility_ratio)}</div>
@@ -1990,7 +2180,7 @@ function fillMetricCards(u, a, t) {
           ${u.utility_ratio >= t.tstr_min ? 'PASS' : 'FAIL'} (Target ≥ ${pct(t.tstr_min)})
         </span>
       </div>
-      <div class="p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
+      <div class="flex-1 p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-950 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
         <div>
           <div class="text-[11px] sm:text-xs text-slate-400 font-bold">Query Equivalence</div>
           <div class="text-base sm:text-lg font-extrabold text-slate-100 mt-0.5">${pct(u.query_equivalence)}</div>
@@ -3243,15 +3433,15 @@ function renderMobileCsvInitial(){
   const container = el('mobileCsvContainer');
   if(!container) return;
   container.innerHTML = `
-    <input id="mobileFileInput" type="file" accept=".csv,text/csv,text/plain,application/vnd.ms-excel,text/comma-separated-values,application/csv,application/octet-stream" class="hidden" />
+    <input id="mobileFileInput" type="file" accept=".csv,.tsv,.xlsx,.json,.jsonl,.parquet,text/csv,text/plain,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/comma-separated-values,application/csv,application/octet-stream" class="hidden" />
     <label id="mobileCsvCard" for="mobileFileInput" class="p-3.5 rounded-2xl bg-slate-900/80 hover:bg-slate-900 border border-slate-800/80 hover:border-indigo-500/50 shadow-md backdrop-blur-xl flex items-center justify-between gap-3 cursor-pointer transition active:scale-[0.98] group block">
       <div class="flex items-center gap-3 min-w-0">
         <div class="h-10 w-10 rounded-xl bg-indigo-500/15 text-indigo-400 grid place-items-center border border-indigo-500/30 text-lg shrink-0 group-hover:scale-105 transition-transform">
           <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
         </div>
         <div class="min-w-0">
-          <h4 class="font-extrabold text-xs text-slate-100 leading-tight">Upload CSV</h4>
-          <p class="text-[10px] text-slate-400 mt-0.5 truncate">Tap to browse CSV from device</p>
+          <h4 class="font-extrabold text-xs text-slate-100 leading-tight">Upload table</h4>
+          <p class="text-[10px] text-slate-400 mt-0.5 truncate">CSV, TSV, Excel, JSON, or Parquet</p>
         </div>
       </div>
       <div class="h-7 w-7 rounded-full bg-slate-800/80 group-hover:bg-indigo-600/30 text-slate-400 group-hover:text-white grid place-items-center shrink-0 border border-slate-700/80 transition">
@@ -3295,8 +3485,8 @@ function resetCsvUpload(){
   if(deskArea){
     deskArea.innerHTML = `
       <label id="csvUploadLabel" class="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 cursor-pointer transition font-bold text-xs text-white shadow-lg shadow-indigo-600/30">
-        <span>📂</span> Upload CSV
-        <input id="fileInput" type="file" accept=".csv,text/csv,text/plain,application/vnd.ms-excel,text/comma-separated-values,application/csv,application/octet-stream" class="hidden" />
+        <span>📂</span> Upload table
+        <input id="fileInput" type="file" accept=".csv,.tsv,.xlsx,.json,.jsonl,.parquet,text/csv,text/plain,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/comma-separated-values,application/csv,application/octet-stream" class="hidden" />
       </label>`;
     const fi = el('fileInput');
     if(fi) fi.addEventListener('change', handleUpload);
@@ -3366,11 +3556,22 @@ async function handleUpload(ev){
   }
 
   const info = await res.json();
+  if (info.pii_findings && info.pii_findings.length) {
+    openPiiModal(file, info);
+    return;
+  }
+  finishUpload(file, info);
+}
+
+function finishUpload(file, info){
+  const st = el('uploadStatus');
+  const mSt = el('mobileUploadStatus');
   resetBqImport();
   state.mode = 'upload';
   state.dataset = null;
   state.upload = info;
-  addToSidebarHistory({ type: 'csv', name: file.name, details: `${info.rows.toLocaleString()} rows · CSV`, key: null });
+  const kind = (file.name.split('.').pop() || 'table').toUpperCase();
+  addToSidebarHistory({ type: 'csv', name: file.name, details: `${info.rows.toLocaleString()} rows · ${kind}`, key: null });
 
   // Transform Desktop upload button area into a loaded-state badge
   const shortName = file.name.length > 28 ? file.name.slice(0, 25) + '…' : file.name;
@@ -3393,14 +3594,106 @@ async function handleUpload(ev){
   // Transform Mobile upload card into loaded badge
   renderMobileCsvLoaded(file, info);
 
-  if(st) st.classList.add('hidden');
+  if (info.warnings && info.warnings.length && st) {
+    st.classList.remove('hidden');
+    st.className = 'text-xs mt-3 text-amber-300 font-medium';
+    st.textContent = info.warnings.join(' ');
+  } else if (st) {
+    st.classList.add('hidden');
+  }
   if(mSt) mSt.classList.add('hidden');
 
-  notifyDatasetLoaded(info.rows, 'CSV File');
+  notifyDatasetLoaded(info.rows, file.name);
   renderUploadConfig(info);
 
   // Smoothly scroll down to column configuration
   el('uploadConfig')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+let pendingPii = null;
+
+function openPiiModal(file, info){
+  pendingPii = { file, info };
+  const box = el('piiFindings');
+  box.innerHTML = info.pii_findings.map((finding, index) => `
+    <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+      <div class="flex items-center justify-between gap-2">
+        <span class="font-bold text-slate-100 text-xs">${escapeHtml(finding.column)}</span>
+        <span class="text-[10px] font-bold uppercase tracking-wide text-amber-300">${escapeHtml(finding.kind)} · ${finding.count}</span>
+      </div>
+      <p class="text-[11px] text-slate-400">Example: ${escapeHtml(finding.redacted_example || 'redacted')}</p>
+      <select data-pii-index="${index}" class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 text-xs">
+        <option value="mask" selected>Mask</option>
+        <option value="drop">Drop column</option>
+        <option value="hash">Salted hash</option>
+        <option value="faker">Replace with synthetic values</option>
+      </select>
+    </div>`).join('');
+  el('piiModal').classList.remove('hidden');
+}
+
+function closePiiModal(){
+  el('piiModal').classList.add('hidden');
+}
+
+function skipPii(){
+  const pending = pendingPii;
+  closePiiModal();
+  if (pending) finishUpload(pending.file, pending.info);
+}
+
+async function applyPii(){
+  if (!pendingPii) return;
+  const actions = [...document.querySelectorAll('#piiFindings select')].map(select => ({
+    column: pendingPii.info.pii_findings[Number(select.dataset.piiIndex)].column,
+    action: select.value,
+  }));
+  const res = await fetch('/api/v1/apply-pii', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ upload_id: pendingPii.info.upload_id, actions }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    alert(err.detail || 'Remediation failed');
+    return;
+  }
+  const info = await res.json();
+  const file = pendingPii.file;
+  closePiiModal();
+  finishUpload(file, info);
+}
+
+function openVerifyModal(){
+  el('verifyResult').classList.add('hidden');
+  el('verifyModal').classList.remove('hidden');
+}
+
+function closeVerifyModal(){
+  el('verifyModal').classList.add('hidden');
+}
+
+async function submitVerify(){
+  const csv = el('verifyCsv').files[0];
+  const certificateFile = el('verifyJson').files[0];
+  const result = el('verifyResult');
+  if (!csv || !certificateFile) {
+    result.className = 'p-3.5 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-200 text-xs';
+    result.textContent = 'Choose both the synthetic CSV and the certificate PDF.';
+    result.classList.remove('hidden');
+    return;
+  }
+  const body = new FormData();
+  body.append('file', csv);
+  body.append('certificate_file', certificateFile);
+  const res = await fetch('/api/v1/verify', { method: 'POST', body });
+  const payload = await res.json().catch(() => ({ status: 'TAMPERED', reason: 'Verification failed.' }));
+  const valid = payload.status === 'VALID';
+  result.className = valid
+    ? 'p-3.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-emerald-200 text-xs'
+    : 'p-3.5 rounded-xl border border-rose-500/40 bg-rose-500/10 text-rose-200 text-xs';
+  result.textContent = `${payload.status}: ${payload.reason || ''}`;
+  result.classList.remove('hidden');
 }
 
 function renderUploadConfig(info){
@@ -3890,11 +4183,7 @@ if (uploadCard) {
     e.preventDefault();
     uploadCard.classList.remove('border-indigo-500', 'bg-indigo-950/40', 'ring-2', 'ring-indigo-500/40');
     const file = e.dataTransfer.files[0];
-    if (file) {
-      el('fileInput').files = e.dataTransfer.files;
-      const event = new Event('change');
-      el('fileInput').dispatchEvent(event);
-    }
+    if (file) handleUpload({ target: { files: e.dataTransfer.files, value: '' } });
   });
 }
 
