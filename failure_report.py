@@ -21,6 +21,8 @@ from certificate import (
     _draw_frame,
     _draw_gate_table,
     _draw_header,
+    _face,
+    use_ui_fonts,
     _draw_identity_grid,
     _draw_paragraph,
     _draw_section_title,
@@ -105,6 +107,7 @@ def render_pdf(report: dict) -> bytes:
 
     buffer = io.BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=letter)
+    use_ui_fonts(pdf)
     pdf.setTitle(f"SynthGauntlet failure report {report.get('run_id', '')}")
     pdf.setAuthor("SynthGauntlet")
     pdf.setSubject("Synthetic data release withheld")
@@ -558,7 +561,7 @@ class _Writer:
         from reportlab.lib.colors import HexColor
         from reportlab.pdfbase.pdfmetrics import stringWidth
 
-        text_width = stringWidth(label, "Helvetica-Bold", 9.5)
+        text_width = stringWidth(label, _face("Helvetica-Bold"), 9.5)
         pill = text_width + 28
         x = self.width / 2 - pill / 2
         self.pdf.setFillColor(HexColor("#ffe4e6"))

@@ -162,6 +162,49 @@ _PANEL = "#f8fafc"
 _INDIGO = "#6366f1"
 _PURPLE = "#9333ea"
 _DEEP_INDIGO = "#4338ca"
+_LOGO_PATH = Path(__file__).resolve().parent / "static" / "synthgauntlet-logo@2x.png"
+_LOGO_ASPECT = 138 / 154
+_FONT_DIR = Path(__file__).resolve().parent / "assets" / "fonts"
+_FONTS_READY = False
+
+
+def _ensure_fonts() -> None:
+    global _FONTS_READY
+    if _FONTS_READY:
+        return
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+
+    pdfmetrics.registerFont(TTFont("PlusJakartaSans", str(_FONT_DIR / "PlusJakartaSans-Regular.ttf")))
+    pdfmetrics.registerFont(TTFont("PlusJakartaSans-Bold", str(_FONT_DIR / "PlusJakartaSans-Bold.ttf")))
+    pdfmetrics.registerFont(TTFont("PlusJakartaSans-Italic", str(_FONT_DIR / "PlusJakartaSans-Italic.ttf")))
+    _FONTS_READY = True
+
+
+def _face(name: str) -> str:
+    """Map the built-in faces onto Plus Jakarta Sans, the UI typeface."""
+    _ensure_fonts()
+    return {
+        "Helvetica": "PlusJakartaSans",
+        "Helvetica-Bold": "PlusJakartaSans-Bold",
+        "Times-Roman": "PlusJakartaSans",
+        "Times-Bold": "PlusJakartaSans-Bold",
+        "Times-Italic": "PlusJakartaSans-Italic",
+    }.get(name, name)
+
+
+def use_ui_fonts(pdf) -> None:
+    """Draw report text in the same family as the product UI. Courier stays for fingerprints."""
+    _ensure_fonts()
+    original = pdf.setFont
+
+    def set_font(fontname, fontsize, leading=None):
+        mapped = _face(fontname)
+        if leading is None:
+            return original(mapped, fontsize)
+        return original(mapped, fontsize, leading)
+
+    pdf.setFont = set_font
 
 # (label, scorecard key, threshold key, direction, family)
 _GATE_ROWS = (
@@ -182,6 +225,7 @@ def render_pdf(certificate: dict) -> bytes:
 
     buffer = io.BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=letter)
+    use_ui_fonts(pdf)
     pdf.setTitle(f"SynthGauntlet Release Certificate {certificate.get('run_id', '')}")
     pdf.setAuthor("SynthGauntlet")
     pdf.setSubject("Synthetic data release certificate")
@@ -438,47 +482,25 @@ def _draw_header(pdf, certificate: dict, width: float, height: float, subtitle: 
 
 
 def _draw_logo(pdf, x: float, y: float, size: float, framed: bool = True) -> None:
-    from reportlab.lib.colors import HexColor, white
-
-    if framed:
-        pdf.saveState()
-        clip = pdf.beginPath()
-        clip.roundRect(x, y, size, size, size * 0.24)
-        pdf.clipPath(clip, stroke=0, fill=0)
-        pdf.linearGradient(x, y + size, x + size, y, (HexColor(_INDIGO), HexColor(_PURPLE)), extend=True)
-        pdf.restoreState()
-        inner, pad = size * 0.5, size * 0.25
-    else:
-        inner, pad = size, 0
-
-    def point(u: float, v: float) -> tuple[float, float]:
-        return x + pad + (u - 2) / 20 * inner, y + size - pad - (v - 2) / 20 * inner
-
-    pdf.saveState()
-    pdf.setStrokeColor(white)
-    pdf.setLineWidth(max(inner * 0.11, 0.8))
-    pdf.setLineCap(1)
-    pdf.setLineJoin(1)
-    for points, closed in (
-        (((12, 2), (2, 7), (12, 12), (22, 7)), True),
-        (((2, 17), (12, 22), (22, 17)), False),
-        (((2, 12), (12, 17), (22, 12)), False),
-    ):
-        path = pdf.beginPath()
-        path.moveTo(*point(*points[0]))
-        for item in points[1:]:
-            path.lineTo(*point(*item))
-        if closed:
-            path.close()
-        pdf.drawPath(path, stroke=1, fill=0)
-    pdf.restoreState()
+    """Place the product shield. `size` is the image height; width follows the asset."""
+    del framed
+    pdf.drawImage(
+        str(_LOGO_PATH),
+        x,
+        y,
+        width=size * _LOGO_ASPECT,
+        height=size,
+        mask="auto",
+        preserveAspectRatio=True,
+        anchor="sw",
+    )
 
 
 def _draw_status_pill(pdf, center_x: float, y: float, label: str) -> None:
     from reportlab.lib.colors import HexColor
     from reportlab.pdfbase.pdfmetrics import stringWidth
 
-    text_width = stringWidth(label, "Helvetica-Bold", 9.5)
+    text_width = stringWidth(label, _face("Helvetica-Bold"), 9.5)
     pill_width = text_width + 44
     pdf.setFillColor(HexColor("#d1fae5"))
     pdf.setStrokeColor(HexColor("#10b981"))
@@ -632,7 +654,8 @@ def _draw_seal(pdf, cx: float, cy: float, certificate: dict) -> None:
     pdf.circle(cx, cy, radius - 5, fill=0, stroke=1)
     pdf.setLineWidth(0.5)
     pdf.circle(cx, cy, radius - 8, fill=0, stroke=1)
-    _draw_logo(pdf, cx - 9, cy + 6, 18, framed=False)
+    logo_size = 22
+    _draw_logo(pdf, cx - (logo_size * _LOGO_ASPECT) / 2, cy + 3, logo_size)
     pdf.setFillColor(white)
     pdf.setFont("Helvetica-Bold", 8)
     pdf.drawCentredString(cx, cy - 6, "CERTIFIED")
@@ -678,7 +701,7 @@ def _wrap_to_width(text: str, font: str, size: float, width: float) -> list[str]
     lines, current = [], ""
     for word in text.split():
         trial = f"{current} {word}".strip()
-        if current and stringWidth(trial, font, size) > width:
+        if current and stringWidth(trial, _face(font), size) > width:
             lines.append(current)
             current = word
         else:
@@ -691,9 +714,9 @@ def _wrap_to_width(text: str, font: str, size: float, width: float) -> list[str]
 def _fit(text: str, font: str, size: float, width: float) -> str:
     from reportlab.pdfbase.pdfmetrics import stringWidth
 
-    if stringWidth(text, font, size) <= width:
+    if stringWidth(text, _face(font), size) <= width:
         return text
-    while text and stringWidth(text + "...", font, size) > width:
+    while text and stringWidth(text + "...", _face(font), size) > width:
         text = text[:-1]
     return text + "..."
 
