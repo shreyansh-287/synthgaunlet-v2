@@ -31,7 +31,49 @@
     }
   </script>
   <style>
-    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #090d16; color: #f1f5f9; overflow-x: hidden; width: 100%; -webkit-tap-highlight-color: transparent; }
+    body { 
+      font-family: 'Plus Jakarta Sans', sans-serif; 
+      background-color: #070d1e; 
+      color: #f1f5f9; 
+      overflow-x: hidden; 
+      width: 100%; 
+      -webkit-tap-highlight-color: transparent;
+      background-color: #030716;
+      background-image: 
+        radial-gradient(1300px 800px at 14% -4%, rgba(37, 99, 235, 0.22) 0%, transparent 60%),
+        radial-gradient(1100px 700px at 86% 18%, rgba(6, 182, 212, 0.18) 0%, rgba(99, 102, 241, 0.14) 35%, transparent 65%),
+        radial-gradient(1350px 850px at 50% 65%, rgba(139, 92, 246, 0.16) 0%, rgba(6, 182, 212, 0.10) 50%, transparent 70%),
+        radial-gradient(1000px 650px at 85% 95%, rgba(99, 102, 241, 0.15) 0%, transparent 60%);
+      background-attachment: fixed;
+    }
+
+    /* Crisp particle grid and fine dotted matrix overlay across canvas */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: 
+        radial-gradient(rgba(56, 189, 248, 0.35) 1.25px, transparent 1.25px),
+        radial-gradient(rgba(139, 92, 246, 0.22) 1.25px, transparent 1.25px);
+      background-size: 32px 32px, 64px 64px;
+      background-position: 0 0, 16px 16px;
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.9;
+    }
+
+    /* Ambient atmospheric glow and curved light trails */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: 
+        radial-gradient(ellipse 140% 50% at 75% 32%, rgba(6, 182, 212, 0.12) 0%, transparent 50%),
+        radial-gradient(ellipse 130% 45% at 20% 68%, rgba(139, 92, 246, 0.10) 0%, transparent 55%);
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.95;
+    }
     body.modal-open { overflow: hidden !important; touch-action: none; }
     .glow { box-shadow: 0 0 35px -5px rgba(99, 102, 241, 0.45); }
     .bar { transition: width .8s cubic-bezier(.22,1,.36,1); }
@@ -54,13 +96,68 @@
       60%  { box-shadow: 0 0 0 4px rgba(34,197,94,0.15); border-color: rgba(34,197,94,0.4); background-color: rgba(34,197,94,0.04); }
       100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); border-color: rgb(51,65,85); background-color: transparent; }
     }
+    .welcome-hero-banner {
+      background-color: #030a1c;
+      background-image: url('/static/synthgauntlet-banner-bg.png');
+      background-size: cover;
+      background-position: right center;
+      background-repeat: no-repeat;
+      border: 1px solid rgba(6, 182, 212, 0.45);
+      box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.2),
+                  0 16px 40px -12px rgba(2, 6, 23, 0.85),
+                  0 0 35px -8px rgba(6, 182, 212, 0.22),
+                  inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
+      border-radius: 1.25rem;
+    }
+    @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+      .welcome-hero-banner {
+        background-image: url('/static/synthgauntlet-banner-bg@2x.png');
+      }
+    }
+
     @media (max-width: 767px) {
       .modal-card { width: 94vw !important; max-width: 94vw !important; max-height: 88vh !important; }
       .history-item { padding: 0.65rem 0.75rem; border-radius: 1rem; }
     }
   </style>
 </head>
-<body class="bg-[#090d16] min-h-screen text-slate-100 flex flex-col md:flex-row relative overflow-x-hidden w-full">
+<body class="bg-[#040817] min-h-screen text-slate-100 flex flex-col md:flex-row relative overflow-x-hidden w-full">
+
+  <!-- Background Decorative Mesh Waves & Curved Light Trails (Pointer-events none) -->
+  <div class="fixed inset-0 pointer-events-none z-0 overflow-hidden" aria-hidden="true">
+    <svg class="w-full h-full opacity-[0.65]" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" viewBox="0 0 1440 900">
+      <defs>
+        <linearGradient id="bgWaveCyan" x1="0%" y1="0%" x2="100%" y2="80%">
+          <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.25"/>
+          <stop offset="45%" stop-color="#3b82f6" stop-opacity="0.20"/>
+          <stop offset="80%" stop-color="#8b5cf6" stop-opacity="0.15"/>
+          <stop offset="100%" stop-color="#a855f7" stop-opacity="0.05"/>
+        </linearGradient>
+        <linearGradient id="bgWaveViolet" x1="100%" y1="10%" x2="0%" y2="90%">
+          <stop offset="0%" stop-color="#c084fc" stop-opacity="0.25"/>
+          <stop offset="50%" stop-color="#818cf8" stop-opacity="0.18"/>
+          <stop offset="100%" stop-color="#06b6d4" stop-opacity="0.05"/>
+        </linearGradient>
+        <radialGradient id="bgGlowOrb1" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.18"/>
+          <stop offset="100%" stop-color="#06b6d4" stop-opacity="0"/>
+        </radialGradient>
+        <radialGradient id="bgGlowOrb2" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#a855f7" stop-opacity="0.16"/>
+          <stop offset="100%" stop-color="#a855f7" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <!-- Atmospheric Glow Orbs -->
+      <circle cx="1250" cy="220" r="280" fill="url(#bgGlowOrb1)"/>
+      <circle cx="200" cy="650" r="320" fill="url(#bgGlowOrb2)"/>
+      <!-- Glowing flowing ribbons -->
+      <path d="M-80,260 C240,140 580,360 1020,200 C1240,130 1420,210 1560,250" fill="none" stroke="url(#bgWaveCyan)" stroke-width="2.5" stroke-dasharray="4 6"/>
+      <path d="M-40,290 C280,180 640,390 1070,230 C1280,160 1460,240 1600,280" fill="none" stroke="url(#bgWaveCyan)" stroke-width="1.8" stroke-opacity="0.8"/>
+      <path d="M-20,320 C300,220 680,420 1100,260 C1300,200 1480,270 1620,310" fill="none" stroke="url(#bgWaveCyan)" stroke-width="1" stroke-opacity="0.5"/>
+      <path d="M-100,560 C320,410 760,670 1180,500 C1380,430 1520,510 1650,540" fill="none" stroke="url(#bgWaveViolet)" stroke-width="2.5" stroke-dasharray="6 8"/>
+      <path d="M-50,590 C370,440 810,700 1220,530 C1420,460 1560,540 1700,570" fill="none" stroke="url(#bgWaveViolet)" stroke-width="1.8" stroke-opacity="0.75"/>
+    </svg>
+  </div>
 
   <!-- Left Sidebar (Collapsible Desktop & Premium Drawer Mobile) -->
   <aside id="sidebar" class="w-72 sm:w-80 md:w-64 max-w-[85vw] md:max-w-none bg-slate-900/98 md:bg-slate-900/95 border-r border-slate-800/80 h-[100dvh] max-h-[100dvh] flex flex-col justify-between p-4 sm:p-5 fixed md:sticky top-0 z-50 md:z-40 backdrop-blur-2xl md:backdrop-blur-md transition-all duration-300 -translate-x-full md:translate-x-0 shrink-0 shadow-2xl md:shadow-none overflow-hidden">
@@ -68,12 +165,11 @@
       <!-- Brand Logo + Collapse / Close Buttons -->
       <div class="flex items-center justify-between px-1 py-1 mb-4 sm:mb-5 shrink-0 gap-2">
         <div class="flex items-center gap-2.5 min-w-0">
-          <div class="h-9 w-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white grid place-items-center font-black text-base shadow-lg shadow-indigo-500/25 shrink-0">
-            <svg class="w-4.5 h-4.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-            </svg>
-          </div>
-          <span class="font-extrabold text-lg tracking-tight text-white whitespace-nowrap truncate">SynthGauntlet</span>
+          <img src="/static/synthgauntlet-logo.png" 
+               srcset="/static/synthgauntlet-logo.png 1x, /static/synthgauntlet-logo@2x.png 2x" 
+               alt="SynthGauntlet Logo" 
+               class="w-9 h-10 object-contain shrink-0 drop-shadow-[0_0_12px_rgba(6,182,212,0.4)]" />
+          <span class="font-extrabold text-lg tracking-tight whitespace-nowrap truncate"><span class="text-cyan-300">Synth</span><span class="bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">Gauntlet</span></span>
         </div>
         <!-- Desktop Collapse Button -->
         <button id="desktopSidebarToggle" type="button" onclick="toggleSidebar()" title="Collapse Sidebar"
@@ -154,7 +250,7 @@
   </button>
 
   <!-- Main Content Wrapper -->
-  <div class="flex-1 flex flex-col min-w-0 w-full overflow-x-hidden">
+  <div class="flex-1 flex flex-col min-w-0 w-full overflow-x-hidden relative z-10">
 
     <!-- Mobile Top Header Bar (Modern App Bar) -->
     <header class="md:hidden sticky top-0 z-30 bg-slate-900/95 border-b border-slate-800/80 px-4 py-3 flex items-center justify-between backdrop-blur-xl shadow-lg">
@@ -164,11 +260,12 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 6h16M4 12h16M4 18h16"/>
           </svg>
         </button>
-        <div class="flex items-center gap-2 min-w-0">
-          <div class="h-8 w-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 grid place-items-center text-white font-black text-xs shadow-md shadow-indigo-500/20 shrink-0">
-            SG
-          </div>
-          <span class="font-extrabold text-base tracking-tight text-white truncate">SynthGauntlet</span>
+        <div class="flex items-center gap-2.5 min-w-0">
+          <img src="/static/synthgauntlet-logo.png" 
+               srcset="/static/synthgauntlet-logo.png 1x, /static/synthgauntlet-logo@2x.png 2x" 
+               alt="SynthGauntlet Logo" 
+               class="w-7 h-8 object-contain shrink-0 drop-shadow-[0_0_10px_rgba(6,182,212,0.35)]" />
+          <span class="font-extrabold text-base tracking-tight whitespace-nowrap truncate"><span class="text-cyan-300">Synth</span><span class="bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">Gauntlet</span></span>
         </div>
       </div>
     </header>
@@ -177,45 +274,62 @@
     <main class="p-4 sm:p-6 md:p-8 lg:p-10 max-w-7xl w-full mx-auto space-y-4 sm:space-y-6 overflow-hidden pb-10">
 
       <!-- Hero Banner Section: Desktop Version (Hidden on Mobile) -->
-      <section class="hidden md:flex bg-gradient-to-r from-indigo-950/80 via-slate-900 to-purple-950/70 rounded-2xl p-4 sm:px-6 sm:py-4 text-white relative overflow-hidden border border-indigo-500/30 shadow-lg items-center justify-between gap-4">
-        <div class="z-10 flex items-center gap-3 min-w-0">
-          <span class="text-xl shrink-0">👋</span>
-          <div class="min-w-0">
-            <h2 class="text-sm sm:text-base font-extrabold tracking-tight text-slate-100 truncate">Welcome to SynthGauntlet</h2>
-            <p class="text-slate-300 text-[11px] sm:text-xs leading-normal font-normal">
-              Import your data and start your privacy & utility evaluation.
+      <section class="welcome-hero-banner hidden md:flex rounded-3xl p-5 sm:px-7 sm:py-6 text-white relative overflow-hidden items-center justify-between gap-6 min-h-[128px]">
+        <div class="z-10 flex items-center gap-5 sm:gap-6 min-w-0">
+          <img src="/static/synthgauntlet-logo.png" 
+               srcset="/static/synthgauntlet-logo.png 1x, /static/synthgauntlet-logo@2x.png 2x" 
+               alt="SynthGauntlet Shield Logo" 
+               class="w-16 h-18 sm:w-18 sm:h-20 object-contain shrink-0 drop-shadow-[0_0_24px_rgba(6,182,212,0.45)]" />
+          <div class="min-w-0 py-0.5">
+            <div class="flex items-center gap-2.5">
+              <span class="text-[10px] sm:text-[11px] font-extrabold tracking-[0.24em] text-cyan-300/90 uppercase">SYNTHGAUNTLET</span>
+              <span class="w-6 h-[1.5px] bg-gradient-to-r from-indigo-500/80 to-transparent inline-block"></span>
+            </div>
+            <h1 class="text-xl sm:text-2xl md:text-[1.75rem] font-black tracking-tight text-white leading-tight mt-1">
+              Welcome to <span class="bg-gradient-to-r from-cyan-400 via-sky-300 to-fuchsia-400 bg-clip-text text-transparent">SynthGauntlet</span>
+            </h1>
+            <p class="text-xs sm:text-[13px] text-slate-300/90 font-normal leading-normal mt-1">
+              Import your data and start your privacy &amp; utility evaluation.
             </p>
+            <div class="flex items-center gap-2 sm:gap-2.5 mt-2.5 text-[9.5px] sm:text-[10.5px] font-extrabold tracking-[0.22em] uppercase text-indigo-300/90">
+              <span class="text-indigo-300">GENERATE</span>
+              <span class="text-cyan-400 font-black">•</span>
+              <span class="text-indigo-300">CHALLENGE</span>
+              <span class="text-fuchsia-400 font-black">•</span>
+              <span class="text-indigo-300">VERIFY</span>
+            </div>
           </div>
-        </div>
-        <div class="shrink-0 flex items-center justify-center h-14 w-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/25 shadow-lg">
-          <svg class="w-7 h-7 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"
-              d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/>
-          </svg>
         </div>
       </section>
 
       <!-- MOBILE ONLY: Option 3 Glassmorphic Dashboard Screen (Hidden on Desktop) -->
       <section class="md:hidden space-y-4">
         
-        <!-- Welcome Card with 3D Glass Illustration -->
-        <div class="bg-gradient-to-r from-indigo-950/90 via-slate-900 to-purple-950/90 rounded-3xl p-5 border border-indigo-500/30 shadow-2xl relative overflow-hidden flex items-center justify-between gap-3">
-          <div class="space-y-1 z-10 min-w-0 flex-1">
-            <div class="flex items-center gap-1.5">
-              <span class="text-sm">👋</span>
-              <h2 class="text-base font-extrabold text-white tracking-tight">Welcome back!</h2>
+        <!-- Welcome Card with Modern Luminous Theme (Mobile) -->
+        <div class="welcome-hero-banner rounded-3xl p-4 sm:p-5 border border-cyan-500/30 shadow-2xl relative overflow-hidden flex items-center justify-between gap-3">
+          <div class="space-y-1 z-10 min-w-0 flex-1 py-0.5">
+            <div class="flex items-center gap-2">
+              <span class="text-[9px] font-extrabold tracking-[0.2em] text-cyan-300 uppercase">SYNTHGAUNTLET</span>
+              <span class="w-4 h-px bg-indigo-500/60 inline-block"></span>
             </div>
-            <p class="text-[11px] text-slate-300 leading-snug">
-              Let's evaluate your data privacy &amp; utility with multi-agent dueling.
+            <h2 class="text-base sm:text-lg font-black text-white tracking-tight mt-0.5">
+              Welcome to <span class="bg-gradient-to-r from-cyan-400 to-fuchsia-400 bg-clip-text text-transparent">SynthGauntlet</span>
+            </h2>
+            <p class="text-[11px] text-slate-300 leading-snug mt-1">
+              Import your data and start your privacy &amp; utility evaluation.
             </p>
+            <div class="flex items-center gap-1.5 mt-2 text-[8.5px] font-extrabold tracking-widest uppercase text-indigo-300">
+              <span>GENERATE</span>
+              <span class="text-cyan-400">•</span>
+              <span>CHALLENGE</span>
+              <span class="text-fuchsia-400">•</span>
+              <span>VERIFY</span>
+            </div>
           </div>
-
-          <!-- Glass Analytics Chart Badge -->
-          <div class="shrink-0 h-14 w-14 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-purple-600/30 border border-indigo-500/40 grid place-items-center shadow-lg shadow-indigo-500/20 backdrop-blur-md">
-            <svg class="w-7 h-7 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
-            </svg>
-          </div>
+          <img src="/static/synthgauntlet-logo.png" 
+               srcset="/static/synthgauntlet-logo.png 1x, /static/synthgauntlet-logo@2x.png 2x" 
+               alt="SynthGauntlet Logo" 
+               class="w-12 h-14 object-contain shrink-0 drop-shadow-[0_0_16px_rgba(6,182,212,0.4)]" />
         </div>
 
         <!-- "What would you like to do?" Section -->
@@ -359,57 +473,135 @@
       </section>
 
       <!-- DESKTOP ONLY: 3 Action Cards (Hidden on Mobile) -->
-      <section class="hidden md:block bg-slate-900/90 rounded-3xl p-6 md:p-8 border border-slate-800 shadow-xl space-y-6">
-        <div>
+      <section id="importDataSection" class="hidden md:block relative overflow-hidden rounded-3xl p-6 md:p-8 border border-slate-700/60 bg-[#060b1e]/90 backdrop-blur-xl shadow-2xl space-y-6">
+        <!-- Flowing Aurora Ribbons Graphic in Top-Right of Section -->
+        <div class="absolute -top-10 -right-10 w-[520px] h-[320px] pointer-events-none overflow-hidden opacity-60 z-0">
+          <svg viewBox="0 0 520 320" fill="none" class="w-full h-full">
+            <path d="M40 240 C160 70, 320 260, 520 80" stroke="url(#secWaveGrad1)" stroke-width="2.5" stroke-linecap="round"/>
+            <path d="M90 270 C200 110, 360 290, 560 110" stroke="url(#secWaveGrad2)" stroke-width="1.8" stroke-dasharray="4 6"/>
+            <path d="M140 300 C240 150, 400 320, 600 140" stroke="url(#secWaveGrad1)" stroke-width="1" stroke-opacity="0.4"/>
+            <defs>
+              <linearGradient id="secWaveGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.75"/>
+                <stop offset="55%" stop-color="#3b82f6" stop-opacity="0.6"/>
+                <stop offset="100%" stop-color="#a855f7" stop-opacity="0.2"/>
+              </linearGradient>
+              <linearGradient id="secWaveGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#a855f7" stop-opacity="0.7"/>
+                <stop offset="100%" stop-color="#06b6d4" stop-opacity="0.1"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+
+        <div class="relative z-10">
           <h3 class="text-xl font-bold text-slate-100 tracking-tight">Import Data</h3>
           <p class="text-xs text-slate-400 mt-1">Choose how you want to bring your data into SynthGauntlet.</p>
         </div>
 
-        <div class="grid grid-cols-3 gap-6">
+        <div class="grid grid-cols-3 gap-6 relative z-10">
           <!-- Card 1: Upload CSV -->
-          <div id="uploadCsvCard" class="bg-slate-950/70 hover:bg-slate-950 border border-slate-800 hover:border-indigo-500/60 rounded-2xl p-6 transition-all duration-300 flex flex-col justify-between items-start min-h-[220px] group shadow-md hover:shadow-indigo-500/10">
-            <div class="space-y-3 w-full">
-              <div class="h-12 w-12 rounded-2xl bg-indigo-500/10 text-indigo-400 grid place-items-center border border-indigo-500/20 group-hover:scale-105 transition-transform">
+          <div id="uploadCsvCard" class="relative overflow-hidden rounded-2xl p-6 transition-all duration-300 flex flex-col justify-between items-start min-h-[225px] group shadow-xl"
+               style="border: 1.5px solid #2563eb; background: linear-gradient(180deg, rgba(8, 20, 52, 0.96) 0%, rgba(5, 12, 34, 0.98) 100%); box-shadow: 0 0 25px -4px rgba(37, 99, 235, 0.42), inset 0 0 15px -4px rgba(37, 99, 235, 0.2);">
+            <!-- Watermark Wave Graphic -->
+            <div class="absolute right-0 top-1/2 -translate-y-1/2 w-48 h-36 pointer-events-none opacity-45 group-hover:opacity-70 transition-opacity">
+              <svg viewBox="0 0 180 140" fill="none" class="w-full h-full">
+                <path d="M10 90 C50 30, 110 120, 175 40" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round"/>
+                <path d="M25 105 C65 45, 125 135, 190 55" stroke="#60a5fa" stroke-width="1.5" stroke-dasharray="3 5"/>
+                <path d="M0 75 C40 15, 100 105, 165 25" stroke="#1d4ed8" stroke-width="1"/>
+                <circle cx="120" cy="50" r="1.5" fill="#60a5fa" opacity="0.6"/>
+                <circle cx="140" cy="65" r="1.5" fill="#60a5fa" opacity="0.7"/>
+                <circle cx="160" cy="55" r="1.5" fill="#60a5fa" opacity="0.8"/>
+                <circle cx="130" cy="75" r="1.5" fill="#60a5fa" opacity="0.5"/>
+                <circle cx="150" cy="85" r="1.5" fill="#60a5fa" opacity="0.6"/>
+              </svg>
+            </div>
+
+            <div class="space-y-3 w-full relative z-10">
+              <div class="h-12 w-12 rounded-2xl bg-blue-600/20 text-blue-400 grid place-items-center border border-blue-500/40 group-hover:scale-105 transition-transform shadow-md shadow-blue-500/20">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
               </div>
-              <h4 class="font-bold text-slate-100 text-base">Upload table</h4>
-              <p class="text-xs text-slate-400 leading-relaxed">Drag and drop CSV, TSV, Excel, JSON, or Parquet</p>
+              <h4 class="font-bold text-white text-base tracking-tight">Upload table</h4>
+              <p class="text-xs text-slate-300/80 leading-relaxed">Drag and drop CSV, TSV, Excel, JSON, or Parquet</p>
             </div>
-            <div id="csvUploadArea" class="mt-6 w-full">
-              <label id="csvUploadLabel" class="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 cursor-pointer transition font-bold text-xs text-white shadow-lg shadow-indigo-600/30">
-                <span>📂</span> Upload table
+            <div id="csvUploadArea" class="mt-6 w-full relative z-10">
+              <label id="csvUploadLabel" class="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl cursor-pointer transition font-bold text-xs text-white"
+                     style="background: linear-gradient(90deg, #2563eb, #3b82f6); box-shadow: 0 4px 18px rgba(37, 99, 235, 0.45); border: 1px solid rgba(255,255,255,0.15);">
+                <span>📁</span> Upload table
                 <input id="fileInput" type="file" accept=".csv,.tsv,.xlsx,.json,.jsonl,.parquet,text/csv,text/plain,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/comma-separated-values,application/csv,application/octet-stream" class="hidden" />
               </label>
             </div>
           </div>
 
           <!-- Card 2: Import from BigQuery -->
-          <div id="bigQueryCard" class="bg-slate-950/70 hover:bg-slate-955 border border-slate-800 hover:border-indigo-500/60 rounded-2xl p-6 transition-all duration-300 flex flex-col justify-between items-start min-h-[220px] group shadow-md hover:shadow-indigo-500/10">
-            <div class="space-y-3 w-full">
-              <div class="h-12 w-12 rounded-2xl bg-blue-500/10 text-blue-400 grid place-items-center border border-blue-500/20 group-hover:scale-105 transition-transform">
+          <div id="bigQueryCard" class="relative overflow-hidden rounded-2xl p-6 transition-all duration-300 flex flex-col justify-between items-start min-h-[225px] group shadow-xl"
+               style="border: 1.5px solid #06b6d4; background: linear-gradient(180deg, rgba(8, 28, 50, 0.96) 0%, rgba(5, 16, 32, 0.98) 100%); box-shadow: 0 0 25px -4px rgba(6, 182, 212, 0.42), inset 0 0 15px -4px rgba(6, 182, 212, 0.2);">
+            <!-- Watermark Digital Skyline Graphic -->
+            <div class="absolute right-2 top-1/2 -translate-y-1/2 w-44 h-32 pointer-events-none opacity-40 group-hover:opacity-65 transition-opacity">
+              <svg viewBox="0 0 160 120" fill="none" class="w-full h-full">
+                <rect x="70" y="60" width="12" height="50" rx="3" fill="#06b6d4" opacity="0.3"/>
+                <rect x="90" y="40" width="12" height="70" rx="3" fill="#06b6d4" opacity="0.5"/>
+                <rect x="110" y="25" width="12" height="85" rx="3" fill="#22d3ee" opacity="0.7"/>
+                <rect x="130" y="48" width="12" height="62" rx="3" fill="#0891b2" opacity="0.4"/>
+                <path d="M50 85 L95 45 L115 30 L145 52" stroke="#67e8f9" stroke-width="1.8" stroke-linecap="round"/>
+                <circle cx="95" cy="45" r="2.5" fill="#67e8f9"/>
+                <circle cx="115" cy="30" r="2.5" fill="#ffffff"/>
+                <circle cx="145" cy="52" r="2.5" fill="#67e8f9"/>
+              </svg>
+            </div>
+
+            <div class="space-y-3 w-full relative z-10">
+              <div class="h-12 w-12 rounded-2xl bg-cyan-500/20 text-cyan-300 grid place-items-center border border-cyan-500/40 group-hover:scale-105 transition-transform shadow-md shadow-cyan-500/20">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 7v10c0 2.21 3.58 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.58 4 8 4s8-1.79 8-4M4 7c0-2.21 3.58-4 8-4s8 1.79 8 4m0 5c0 2.21-3.58 4-8 4s-8-1.79-8-4"/></svg>
               </div>
-              <h4 class="font-bold text-slate-100 text-base">Import from BigQuery</h4>
-              <p class="text-xs text-slate-400 leading-relaxed">Connect directly to your BigQuery dataset</p>
+              <h4 class="font-bold text-white text-base tracking-tight">Import from BigQuery</h4>
+              <p class="text-xs text-slate-300/80 leading-relaxed">Connect directly to your BigQuery dataset</p>
             </div>
-            <div id="bqUploadArea" class="mt-6 w-full">
-              <button id="bqTabBtn" type="button" class="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 cursor-pointer transition font-bold text-xs text-white shadow-lg shadow-indigo-600/30">
-                <span>🔷</span> Connect BigQuery
+            <div id="bqUploadArea" class="mt-6 w-full relative z-10">
+              <button id="bqTabBtn" type="button" class="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl cursor-pointer transition font-bold text-xs text-white"
+                      style="background: linear-gradient(90deg, #0284c7, #2563eb); box-shadow: 0 4px 18px rgba(6, 182, 212, 0.42); border: 1px solid rgba(255,255,255,0.15);">
+                <span>💠</span> Connect BigQuery
               </button>
             </div>
           </div>
 
           <!-- Card 3: Use Sample Dataset -->
-          <div class="bg-slate-950/70 hover:bg-slate-955 border border-slate-800 hover:border-indigo-500/60 rounded-2xl p-6 transition-all duration-300 flex flex-col justify-between items-start min-h-[220px] group shadow-md hover:shadow-indigo-500/10">
-            <div class="space-y-3 w-full">
-              <div class="h-12 w-12 rounded-2xl bg-purple-500/10 text-purple-400 grid place-items-center border border-purple-500/20 group-hover:scale-105 transition-transform">
+          <div id="sampleCard" class="relative overflow-hidden rounded-2xl p-6 transition-all duration-300 flex flex-col justify-between items-start min-h-[225px] group shadow-xl"
+               style="border: 1.5px solid #a855f7; background: linear-gradient(180deg, rgba(26, 14, 52, 0.96) 0%, rgba(14, 8, 32, 0.98) 100%); box-shadow: 0 0 25px -4px rgba(168, 85, 247, 0.42), inset 0 0 15px -4px rgba(168, 85, 247, 0.2);">
+            <!-- Watermark Isometric Glowing Cubes Graphic -->
+            <div class="absolute right-1 top-1/2 -translate-y-1/2 w-44 h-36 pointer-events-none opacity-50 group-hover:opacity-75 transition-opacity">
+              <svg viewBox="0 0 160 130" fill="none" class="w-full h-full">
+                <!-- Cube 1 (Center-back) -->
+                <g transform="translate(75, 20)">
+                  <polygon points="25,0 50,14 25,28 0,14" fill="#a855f7" opacity="0.6"/>
+                  <polygon points="0,14 25,28 25,56 0,42" fill="#7c3aed" opacity="0.8"/>
+                  <polygon points="25,28 50,14 50,42 25,56" fill="#9333ea" opacity="0.7"/>
+                </g>
+                <!-- Cube 2 (Right-front) -->
+                <g transform="translate(100, 52)">
+                  <polygon points="25,0 50,14 25,28 0,14" fill="#c084fc" opacity="0.75"/>
+                  <polygon points="0,14 25,28 25,56 0,42" fill="#9333ea" opacity="0.9"/>
+                  <polygon points="25,28 50,14 50,42 25,56" fill="#a855f7" opacity="0.8"/>
+                </g>
+                <!-- Cube 3 (Left-front) -->
+                <g transform="translate(50, 58)">
+                  <polygon points="25,0 50,14 25,28 0,14" fill="#818cf8" opacity="0.55"/>
+                  <polygon points="0,14 25,28 25,56 0,42" fill="#4f46e5" opacity="0.75"/>
+                  <polygon points="25,28 50,14 50,42 25,56" fill="#6366f1" opacity="0.65"/>
+                </g>
+              </svg>
+            </div>
+
+            <div class="space-y-3 w-full relative z-10">
+              <div class="h-12 w-12 rounded-2xl bg-purple-500/20 text-purple-300 grid place-items-center border border-purple-500/40 group-hover:scale-105 transition-transform shadow-md shadow-purple-500/20">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
               </div>
-              <h4 class="font-bold text-slate-100 text-base">Use Sample Dataset</h4>
-              <p class="text-xs text-slate-400 leading-relaxed">Explore with pre-loaded demo data</p>
+              <h4 class="font-bold text-white text-base tracking-tight">Use Sample Dataset</h4>
+              <p class="text-xs text-slate-300/80 leading-relaxed">Explore with pre-loaded demo data</p>
             </div>
-            <a href="#sampleDatasetsSection" onclick="highlightSampleSection(event)" class="mt-6 w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 cursor-pointer transition font-bold text-xs text-white shadow-lg shadow-indigo-600/30">
-              <span>🧪</span> Select Sample
+            <a href="#sampleDatasetsSection" onclick="highlightSampleSection(event)" class="mt-6 w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl cursor-pointer transition font-bold text-xs text-white relative z-10"
+               style="background: linear-gradient(90deg, #7c3aed, #4f46e5); box-shadow: 0 4px 18px rgba(168, 85, 247, 0.45); border: 1px solid rgba(255,255,255,0.15);">
+              <span>✏️</span> Select Sample
             </a>
           </div>
         </div>
