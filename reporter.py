@@ -63,6 +63,8 @@ def build_scorecard(
         f"Re-identification: {a.re_id_rate}, Membership accuracy: {a.membership_accuracy}",
         model=settings.reporter_model,
         temperature=0.6,
+        role="reporter",
+        purpose="Write the executive summary from the final scorecard numbers.",
     )
 
     if narrative:

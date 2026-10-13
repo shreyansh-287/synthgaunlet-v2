@@ -32,6 +32,7 @@ from pydantic import BaseModel
 from starlette.responses import JSONResponse
 
 import certificate
+import failure_report
 import llm
 import bigquery_client as bq
 import pii_scanner
@@ -873,6 +874,14 @@ def _require_certificate(run_id: str) -> dict:
 @app.get("/api/v1/certificate/{run_id}")
 def certificate_json(run_id: str):
     return _require_certificate(run_id)
+
+
+@app.get("/api/v1/failure-report/{run_id}/pdf")
+def failure_report_pdf(run_id: str):
+    path = failure_report.failure_pdf(run_id)
+    if path is None:
+        raise HTTPException(status_code=404, detail="No failure report was issued for this run.")
+    return FileResponse(path, media_type="application/pdf", filename=f"failure_report_{run_id}.pdf")
 
 
 @app.get("/api/v1/certificate/{run_id}/pdf")

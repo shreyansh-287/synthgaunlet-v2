@@ -101,7 +101,8 @@ def build_rescue_plan(
             "rare_category_floor": max(0.05, float(plan.rare_category_floor)),
             "rationale": (
                 "Rescue attempt 1: recombination at least 0.65, jitter up 50%, "
-                "rare-category floor 0.05, then drop the closest DCR rows."
+                "rare-category floor 0.05, then search DCR-pruned redraws and "
+                "suppress singleton quasi-identifier combinations."
             ),
         })
     if attempt == 2:
@@ -280,7 +281,10 @@ def diagnose_and_advise(
         '{"feedback": "<instruction to Forge>", "priority": "privacy|utility|balanced"}'
     )
 
-    data = llm.generate_json(prompt, model=settings.orchestrator_model, system_instruction=_SYSTEM)
+    data = llm.generate_json(
+        prompt, model=settings.orchestrator_model, system_instruction=_SYSTEM,
+        role="orchestrator", purpose="Advise the next synthesis round from the failed gate scores.",
+    )
     if data and data.get("feedback"):
         return str(data.get("feedback"))
 
@@ -327,7 +331,10 @@ def next_plan(
         '"categorical_shuffle": <0..1>, "rare_category_floor": <0..1>, '
         '"feedback": "<one sentence to Forge>"}'
     )
-    data = llm.generate_json(prompt, model=settings.orchestrator_model, system_instruction=_SYSTEM)
+    data = llm.generate_json(
+        prompt, model=settings.orchestrator_model, system_instruction=_SYSTEM,
+        role="orchestrator", purpose="Suggest the next synthesis knobs from the failed scores.",
+    )
     if data:
         try:
             new_plan = GenerationPlan(

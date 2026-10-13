@@ -401,7 +401,7 @@ def _draw_frame(pdf, width: float, height: float) -> None:
     pdf.roundRect(24, 24, width - 48, height - 48, 11, fill=0, stroke=1)
 
 
-def _draw_header(pdf, certificate: dict, width: float, height: float, subtitle: str) -> None:
+def _draw_header(pdf, certificate: dict, width: float, height: float, subtitle: str, id_label: str = "CERTIFICATE ID") -> None:
     from reportlab.lib.colors import HexColor, white
 
     top = height - 24
@@ -428,7 +428,7 @@ def _draw_header(pdf, certificate: dict, width: float, height: float, subtitle: 
 
     pdf.setFillColor(HexColor("#a5b4fc"))
     pdf.setFont("Helvetica-Bold", 7.5)
-    pdf.drawRightString(width - 50, top - 36, "CERTIFICATE ID")
+    pdf.drawRightString(width - 50, top - 36, id_label)
     pdf.setFillColor(white)
     pdf.setFont("Courier-Bold", 11)
     pdf.drawRightString(width - 50, top - 50, str(certificate.get("run_id", "")))

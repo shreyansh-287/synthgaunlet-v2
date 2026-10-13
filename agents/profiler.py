@@ -191,6 +191,8 @@ def analyze_profile(
         model=settings.generator_model,
         system_instruction=_ANALYST_SYSTEM,
         temperature=0.2,
+        role="profiler",
+        purpose="Infer dependencies, risky column groups, and the generation order from the aggregate profile.",
     )
 
     if result is not None and isinstance(result, SemanticProfile):

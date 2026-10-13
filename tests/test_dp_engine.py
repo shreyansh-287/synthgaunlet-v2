@@ -37,6 +37,9 @@ def test_budget_shares_sum_to_the_total():
     assert len(shares) == 7
     assert sum(shares) == pytest.approx(1.0)
     assert all(share > 0 for share in shares)
+    weighted = allocate_budget(1.0, 3, [1.0, 1.0, 3.0])
+    assert sum(weighted) == pytest.approx(1.0)
+    assert weighted[2] > weighted[0]
 
 
 def test_laplace_clips_negative_counts_and_renormalizes():
@@ -82,6 +85,34 @@ def test_noisy_marginals_spend_at_most_the_budget_and_preserve_dependence():
     assert len(drawn) == 300
     agreement = (drawn["city"].eq("young") == drawn["age"].eq(20)).mean()
     assert agreement > 0.8
+
+
+def test_numeric_draws_spread_inside_the_released_bins():
+    rng = np.random.RandomState(0)
+    frame = pd.DataFrame({
+        "amount": rng.normal(loc=50, scale=10, size=500),
+        "label": rng.randint(0, 2, size=500),
+    })
+    model = fit_marginals(frame, epsilon_total=2.0, label_column="label", seed=1)
+    drawn = sample(model, 300, seed=2)
+    assert drawn["amount"].nunique() > 8
+    assert float(drawn["amount"].min()) >= float(frame["amount"].min()) - 1e-6
+    assert float(drawn["amount"].max()) <= float(frame["amount"].max()) + 1e-6
+
+
+def test_label_keeps_a_two_way_when_other_columns_move_together():
+    rng = np.random.RandomState(0)
+    shared = rng.normal(size=400)
+    frame = pd.DataFrame({
+        "a": shared,
+        "b": shared + rng.normal(scale=0.01, size=400),
+        "c": shared + rng.normal(scale=0.01, size=400),
+        "d": shared + rng.normal(scale=0.01, size=400),
+        "label": (shared > 0).astype(int),
+    })
+    model = fit_marginals(frame, epsilon_total=1.0, label_column="label", seed=1)
+    assert model.epsilon_spent == pytest.approx(1.0)
+    assert any(name.startswith("2-way:") and "label" in name for name in model.query_names)
 
 
 def test_guarantee_text_is_formal_only_for_a_pure_laplace_release():
