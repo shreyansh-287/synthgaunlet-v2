@@ -190,6 +190,8 @@ def generate_candidate_plans(
         model=settings.generator_model,
         system_instruction=_SYSTEM,
         temperature=0.4,
+        role="generator",
+        purpose=f"Propose this round's synthesis plans from scores and column summaries.",
     )
 
     candidates: List[SynthesisConfig] = []
@@ -452,6 +454,35 @@ def drop_low_dcr_rows(
         drop[order[:drop_n]] = True
     kept = synth.loc[~drop].reset_index(drop=True)
     return kept if not kept.empty else synth.reset_index(drop=True)
+
+
+def suppress_unique_qi_combinations(
+    synth: pd.DataFrame,
+    quasi_identifiers: Optional[List[str]] = None,
+) -> pd.DataFrame:
+    """Replace singleton synthetic QI combinations with an existing non-singleton combination."""
+    out = synth.copy().reset_index(drop=True)
+    cols = [c for c in (quasi_identifiers or []) if c in out.columns]
+    if not cols or len(out) < 3:
+        return out
+
+    keys = out[cols].fillna("<NA>").astype(str).agg("|".join, axis=1)
+    counts = keys.value_counts()
+    singleton_keys = list(counts[counts == 1].index)
+    donor_keys = list(counts[counts >= 2].index)
+    if not singleton_keys or not donor_keys:
+        return out
+
+    donors = {
+        key: out.loc[keys == key, cols].iloc[0].copy()
+        for key in donor_keys
+    }
+    for index, key in enumerate(singleton_keys):
+        row_index = int(keys[keys == key].index[0])
+        donor = donors[donor_keys[index % len(donor_keys)]]
+        for column in cols:
+            out.at[row_index, column] = donor[column]
+    return out
 
 
 def generalize_frame(

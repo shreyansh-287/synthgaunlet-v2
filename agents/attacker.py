@@ -66,7 +66,10 @@ def _plan_initial_attack(
         '{"focus_columns": ["..."], "threshold": <float>, '
         '"run_outlier_linkage": <bool>, "hypothesis": "<text>"}'
     )
-    data = llm.generate_json(prompt, model=settings.attacker_model, system_instruction=_SYSTEM)
+    data = llm.generate_json(
+        prompt, model=settings.attacker_model, system_instruction=_SYSTEM,
+        role="attacker", purpose="Choose which quasi-identifiers to probe and how strict the distance cutoff should be.",
+    )
     if not data:
         return {
             "focus_columns": quasi_identifiers,
@@ -99,7 +102,10 @@ def _plan_followup_attack(
         "Decide if you want a second attack pass (e.g. probing a tighter QI subset or stricter threshold):\n"
         '{"execute_secondary": <bool>, "secondary_qis": ["..."], "stricter_threshold": <float>, "hypothesis": "<text>"}'
     )
-    data = llm.generate_json(prompt, model=settings.attacker_model, system_instruction=_SYSTEM)
+    data = llm.generate_json(
+        prompt, model=settings.attacker_model, system_instruction=_SYSTEM,
+        role="attacker", purpose="Decide whether a second privacy-attack pass is useful.",
+    )
     if data and data.get("execute_secondary"):
         sec_qis = [c for c in data.get("secondary_qis", []) if c in quasi_identifiers]
         return {
@@ -132,6 +138,8 @@ def _interpret(
         model=settings.attacker_model,
         system_instruction=_NARRATOR,
         temperature=0.8,
+        role="attacker",
+        purpose="Write the attack narrative from the measured privacy scores.",
     )
     if text:
         return text

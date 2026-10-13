@@ -876,6 +876,11 @@
                 <p class="text-[11px] font-extrabold text-rose-200">This file is not fit to download</p>
                 <ul id="downloadBlockedReasons" class="mt-1.5 space-y-1 text-[11px] leading-snug text-rose-100/90 list-disc pl-4"></ul>
               </div>
+              <a id="failureReportBtn" href="#" download
+                 class="hidden w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-400/40 text-rose-100 font-bold text-xs shadow-sm transition text-center">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                <span>Download failure report</span>
+              </a>
               <a id="topDownloadBtn" href="#" download
                  class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs shadow-md shadow-emerald-500/20 transition transform hover:-translate-y-0.5 text-center">
                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
@@ -1135,7 +1140,7 @@
             <li><strong>Inspect & Configure Columns</strong>: Confirm the inferred label, quasi-identifiers, output row count, synthesis engine, and release policy.</li>
             <li><strong>Forge & Attack</strong>: Launch the adversarial loop and watch Forge, Auditor, Challenger, and Arbiter evaluate multiple candidates over successive rounds.</li>
             <li><strong>Review the Scorecard</strong>: Inspect every utility and privacy gate, the Pareto frontier, differential-privacy statement, policy used, and fairness warnings.</li>
-            <li><strong>Release & Verify</strong>: A certified run enables CSV and certificate downloads plus BigQuery export. Use <em>Check certificate</em> with the CSV and certificate PDF to detect any later change.</li>
+            <li><strong>Release & Verify</strong>: A certified run enables CSV and certificate downloads plus BigQuery export. Use <em>Check certificate</em> with the CSV and certificate PDF to detect any later change. If the gate fails, download the failure report PDF for the exact metrics and engine analysis. The CSV stays unavailable.</li>
           </ol>
         </div>
 
@@ -1317,11 +1322,11 @@
           <div class="grid sm:grid-cols-2 gap-3">
             <div class="p-3.5 rounded-2xl bg-slate-950/50 border border-sky-500/20">
               <p class="font-bold text-sky-300 text-xs">Differential Privacy Engine</p>
-              <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">Choose <strong>Laplace DP</strong> to split an epsilon budget across one-way and selected two-way marginal queries. Smaller epsilon adds more noise. The scorecard states a formal epsilon guarantee only when the released table remains on the pure DP path; a hybrid or Auto-Heal replacement displays <em>No formal DP guarantee</em>.</p>
+              <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">Choose <strong>Laplace DP</strong> to split an epsilon budget across one-way marginals and two-way tables that tie the label to its strongest columns. Numeric values are drawn inside each noisy bin, and later rounds redraw from that same release. Smaller epsilon adds more noise. The scorecard states a formal epsilon guarantee only when the released table remains on the pure DP path; a hybrid or Auto-Heal replacement displays <em>No formal DP guarantee</em>.</p>
             </div>
             <div class="p-3.5 rounded-2xl bg-slate-950/50 border border-emerald-500/20">
               <p class="font-bold text-emerald-300 text-xs">Auto-Heal Rescue</p>
-              <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">If all ordinary rounds miss the gate, Auto-Heal applies targeted deterministic repair strategies and re-runs the full Auditor, Challenger, and Arbiter checks. A repaired file becomes downloadable only after it passes every gate and is labeled <strong>CERTIFIED_AFTER_RESCUE</strong>.</p>
+              <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">If all ordinary rounds miss the gate, Auto-Heal searches deterministic privacy-safe redraws, removes rows closest to training records, suppresses singleton quasi-identifier combinations, and can apply generalization or second-generation synthesis. Every candidate is rechecked by the Auditor, Challenger, and Arbiter. A repaired file becomes downloadable only after it passes every gate and is labeled <strong>CERTIFIED_AFTER_RESCUE</strong>.</p>
             </div>
             <div class="p-3.5 rounded-2xl bg-slate-950/50 border border-violet-500/20">
               <p class="font-bold text-violet-300 text-xs">Pareto Privacy–Utility Frontier</p>
@@ -1684,7 +1689,7 @@ function showDpGuarantee(resp){
   const formal = guarantee.startsWith('Formal DP guarantee');
   if(description) {
     description.textContent = formal
-      ? 'This table was sampled only from Laplace-noised marginals under the displayed epsilon budget. Repeated sampling is post-processing and does not spend additional epsilon.'
+      ? 'This table was sampled only from Laplace-noised marginals under the displayed epsilon budget. The label stays tied to its strongest columns, and numeric values are drawn inside each bin. Repeated sampling is post-processing and does not spend additional epsilon.'
       : 'This run used the hybrid synthesis path, or Auto-Heal replaced a DP table. It is still evaluated by every deterministic utility and privacy attack gate, but it does not carry a mathematical differential-privacy epsilon guarantee.';
   }
   card.className = formal
@@ -1711,6 +1716,9 @@ function releaseFailureReasons(resp) {
     [u.query_equivalence, t.query_equivalence_min, 'at least', 'Query equivalence'],
     [a.re_id_rate, t.reid_max, 'at most', 'Re-identification risk'],
     [a.membership_accuracy, t.membership_max, 'at most', 'Membership leakage'],
+    [a.attribute_inference_advantage, t.attribute_inference_max, 'at most', 'Attribute inference advantage'],
+    [a.linkage_rate, t.linkage_max, 'at most', 'Auxiliary linkage'],
+    [a.near_duplicate_rate, t.near_duplicate_max, 'at most', 'Near-duplicate rows'],
   ];
   const reasons = [];
   checks.forEach(([value, limit, direction, label]) => {
@@ -2043,7 +2051,11 @@ function renderHistoryReportModalContent(item, runResult) {
 
     if (runResult.run_id) {
       if (!isCertified(runResult)) {
-        html += `<div class="pt-2">${downloadBlockedHtml(runResult)}</div>`;
+        html += `<div class="pt-2">${downloadBlockedHtml(runResult)}</div>
+          <a href="/api/v1/failure-report/${runResult.run_id}/pdf" download
+             class="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-400/40 text-rose-100 font-extrabold text-xs transition text-center">
+            Download failure report
+          </a>`;
       } else {
         const dsName = item.name || item.dataset || 'synthetic_dataset';
         html += `
@@ -2113,6 +2125,7 @@ function renderScorecard(resp) {
     downloadBtn.classList.remove('hidden');
     if (exportBtn) exportBtn.classList.remove('hidden');
     if (blocked) blocked.classList.add('hidden');
+    el('failureReportBtn')?.classList.add('hidden');
     const certBtn = el('certificatePdfBtn');
     const verifyBtn = el('verifyCertificateBtn');
     if (certBtn) {
@@ -2132,6 +2145,11 @@ function renderScorecard(resp) {
     if (exportBtn) exportBtn.classList.add('hidden');
     el('certificatePdfBtn')?.classList.add('hidden');
     el('verifyCertificateBtn')?.classList.add('hidden');
+    const reportBtn = el('failureReportBtn');
+    if (reportBtn && resp.run_id) {
+      reportBtn.href = `/api/v1/failure-report/${resp.run_id}/pdf`;
+      reportBtn.classList.remove('hidden');
+    }
     if (blocked) {
       blocked.classList.remove('hidden');
       el('downloadBlockedReasons').innerHTML = releaseFailureReasons(resp)

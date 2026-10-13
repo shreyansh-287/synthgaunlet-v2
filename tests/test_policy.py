@@ -45,7 +45,9 @@ def test_gemini_policy_is_bounded_and_does_not_decide_release(monkeypatch):
 
     def fake_generate(prompt, schema, **kwargs):
         assert "No dataset rows or records are included" in prompt
+        assert "re-identification below 0.5%" in prompt
         return schema(
+            relevant=True,
             fidelity_min=0.91,
             tstr_min=0.92,
             query_equivalence_min=0.97,
@@ -65,3 +67,41 @@ def test_gemini_policy_is_bounded_and_does_not_decide_release(monkeypatch):
     assert result.source == "gemini"
     assert result.thresholds.reid_max == pytest.approx(0.004)
     assert result.policy_name == "Strict technical privacy"
+    assert result.explanation == "Tighter privacy ceilings and high utility floors."
+
+
+def test_irrelevant_or_failed_model_keeps_local_policy(monkeypatch):
+    monkeypatch.setattr(policy.llm, "is_enabled", lambda: True)
+    request = "Tell me a joke about the weather."
+
+    monkeypatch.setattr(
+        policy.llm,
+        "generate_structured",
+        lambda *args, **kwargs: policy._LLMPolicy(
+            relevant=False,
+            fidelity_min=0.99,
+            tstr_min=0.99,
+            query_equivalence_min=0.99,
+            reid_max=0.001,
+            membership_max=0.51,
+            attribute_inference_max=0.01,
+            linkage_max=0.01,
+            near_duplicate_max=0.01,
+            max_rounds=1,
+            policy_name="Unused",
+            explanation="Unused",
+        ),
+    )
+    irrelevant = policy.interpret(request)
+    local = policy._deterministic_interpretation(request)
+    assert irrelevant.source == "deterministic"
+    assert irrelevant.explanation == local.explanation
+    assert irrelevant.thresholds == local.thresholds
+
+    monkeypatch.setattr(policy.llm, "generate_structured", lambda *args, **kwargs: None)
+    failed = policy.interpret(
+        "Prioritize privacy. Keep re-identification below 0.5%."
+    )
+    assert failed.source == "deterministic"
+    assert failed.thresholds.reid_max == pytest.approx(0.005)
+    assert "Interpreted locally" in failed.explanation

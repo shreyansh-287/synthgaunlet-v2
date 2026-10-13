@@ -288,6 +288,15 @@ class ForgeRequest(BaseModel):
     policy_explanation: str = ""
 
 
+class AIUsageStep(BaseModel):
+    """One Gemini advisory call. used_model is false when the deterministic fallback ran."""
+
+    role: str
+    purpose: str
+    model: str = ""
+    used_model: bool = False
+
+
 class ForgeResponse(BaseModel):
     run_id: str
     status: str  # "SUCCESS" | "FAILED_TO_CONVERGE"
@@ -313,6 +322,7 @@ class ForgeResponse(BaseModel):
     policy_name: str = "Balanced"
     policy_source: str = "preset"
     policy_explanation: str = ""
+    ai_usage: List[AIUsageStep] = Field(default_factory=list)
 
 
 class RunStartResponse(BaseModel):

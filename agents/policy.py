@@ -24,6 +24,7 @@ class PolicyInterpretation(BaseModel):
 
 
 class _LLMPolicy(BaseModel):
+    relevant: bool
     fidelity_min: float = Field(ge=0.0, le=1.0)
     tstr_min: float = Field(ge=0.0, le=1.0)
     query_equivalence_min: float = Field(ge=0.0, le=1.0)
@@ -134,37 +135,77 @@ def _deterministic_interpretation(request: str) -> PolicyInterpretation:
 
 
 def interpret(request: str) -> PolicyInterpretation:
+    """Turn a policy sentence into release limits.
+
+    Gemini extracts the requested meaning when it is available and the sentence is about
+    synthesis quality or privacy. Any other result keeps the local keyword interpretation.
+    """
     fallback = _deterministic_interpretation(request)
     if not llm.is_enabled():
         return fallback
 
     defaults = Thresholds().model_dump()
+    privacy_defaults = PRESETS["privacy_first"]["thresholds"].model_dump()
+    analytics_defaults = PRESETS["analytics_first"]["thresholds"].model_dump()
     prompt = (
-        "Translate this policy request into release-gate thresholds. No dataset rows or records "
-        "are included. Higher *_min values are stricter utility requirements. Lower *_max values "
-        "are stricter privacy requirements. Keep max_rounds from 1 to 5. Never claim HIPAA, GDPR, "
-        "or other legal compliance. Return a short name and explain the trade-off.\n\n"
-        f"Default thresholds: {defaults}\n"
+        "Translate this policy sentence into SynthGauntlet release-gate numbers. "
+        "No dataset rows or records are included. Return JSON only.\n\n"
+        "Meaning rules:\n"
+        "- relevant=true only when the sentence is about synthetic-data usefulness, privacy, "
+        "attacks, or release limits.\n"
+        "- relevant=false for unrelated text. Then keep every numeric field at the balanced defaults.\n"
+        "- Start from the balanced defaults. Change a field only when the sentence asks for it.\n"
+        "- 'prioritize privacy', 'strict', or 'sensitive data' starts from the privacy-first numbers, "
+        "then applies any explicit percentages.\n"
+        "- 'prioritize analytics', 'utility', or 'model quality' starts from the analytics-first numbers, "
+        "then applies any explicit percentages.\n"
+        "- An explicit percentage is exact: 're-identification below 0.5%' sets reid_max to 0.005; "
+        "'fidelity at least 90%' sets fidelity_min to 0.90. 'below', 'under', and 'at most' set a "
+        "privacy ceiling. 'at least' and 'above' set a utility floor.\n"
+        "- Field map: fidelity->fidelity_min, TSTR or model utility->tstr_min, "
+        "query->query_equivalence_min, re-identification or reid->reid_max, "
+        "membership->membership_max, attribute inference->attribute_inference_max, "
+        "linkage->linkage_max, near duplicate->near_duplicate_max.\n"
+        "- Higher *_min values demand more usefulness. Lower *_max values demand more privacy.\n"
+        "- Keep max_rounds at 5 unless the sentence requests fewer rounds, from 1 to 5.\n"
+        "- policy_name is a short name for this exact request.\n"
+        "- explanation restates the applied limits in the user's terms. Do not claim HIPAA, GDPR, "
+        "or any legal compliance, and do not approve the release.\n\n"
+        f"Balanced defaults: {defaults}\n"
+        f"Privacy-first numbers: {privacy_defaults}\n"
+        f"Analytics-first numbers: {analytics_defaults}\n"
         f"User policy request: {request[:2000]}"
     )
     settings = get_settings()
-    parsed = llm.generate_structured(
-        prompt,
-        _LLMPolicy,
-        model=settings.orchestrator_model,
-        system_instruction=(
-            "You configure technical privacy and utility thresholds. You never approve a release; "
-            "deterministic code applies the resulting thresholds."
-        ),
-        temperature=0.1,
-    )
-    if parsed is None:
+    try:
+        parsed = llm.generate_structured(
+            prompt,
+            _LLMPolicy,
+            model=settings.orchestrator_model,
+            system_instruction=(
+                "You extract technical privacy and utility thresholds from one policy sentence. "
+                "You never approve a release; deterministic code applies the resulting thresholds."
+            ),
+            temperature=0.0,
+            role="policy",
+            purpose="Translate the policy sentence into release-gate numbers.",
+        )
+    except Exception:
+        return fallback
+    if parsed is None or not parsed.relevant:
         return fallback
     values = parsed.model_dump()
-    name = values.pop("policy_name")
-    explanation = values.pop("explanation")
+    values.pop("relevant", None)
+    name = str(values.pop("policy_name") or "").strip()
+    explanation = str(values.pop("explanation") or "").strip()
+    if not name or not explanation:
+        return fallback
+    try:
+        thresholds = Thresholds(**values)
+    except (TypeError, ValueError):
+        return fallback
     return PolicyInterpretation(
-        thresholds=Thresholds(**values),
+        thresholds=thresholds,
         policy_name=name[:80],
         explanation=explanation[:500],
         source="gemini",

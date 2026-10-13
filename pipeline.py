@@ -13,14 +13,17 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from typing import Callable, Dict, List, Optional
 
+import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
 import certificate
+import failure_report
 import llm
 import reporter
 from agents import attacker, dp_engine, generator, orchestrator, profiler, statistician
@@ -28,6 +31,7 @@ from agents.profiler import profile_dataframe
 from config import get_settings
 from data_source import get_data_source
 from models import (
+    AIUsageStep,
     CandidateEvaluation,
     ForgeRequest,
     ForgeResponse,
@@ -207,20 +211,34 @@ def _auto_heal(
     prior: Optional[dict],
     max_rounds: int,
     best_score: float,
+    failure_brief: str = "",
 ) -> Optional[dict]:
     """Three-step rescue ladder. Every attempt is scored on the original real split.
 
     Returns None when the user aborts mid-rescue.
     """
     steps = (
-        (1, "tighten", "Tighten recombination, jitter, and the rare-category floor, then drop the closest 5% of DCR rows."),
+        (1, "tighten", "Search privacy-safe redraws, remove low-DCR rows, and suppress singleton QI combinations."),
         (2, "generalize", "Bucket numeric quasi-identifiers, collapse categories under 2% to Other, and winsorize tails."),
         (3, "second_generation", "Resample from the best failed candidate with stronger perturbation."),
     )
+    advice = ""
+    if failure_brief:
+        advice = llm.advise(
+            "orchestrator",
+            "Explain which failed gates Auto-Heal should focus on.",
+            (
+                "The ordinary rounds missed the release gate. The rescue ladder still runs in code, "
+                "and only a table that passes every gate can be released. "
+                f"Latest scores: {failure_brief}"
+            ),
+            model=get_settings().orchestrator_model,
+        )
     emit({
         "type": "rescue_started",
         "attempts": len(steps),
-        "message": "Release gate failed. Auto-Heal rescue ladder started.",
+        "message": "Release gate failed. Auto-Heal rescue ladder started."
+        + (f" {advice}" if advice else ""),
     })
     numeric_qis = [
         c for c in cols["quasi_identifiers"]
@@ -245,38 +263,81 @@ def _auto_heal(
             "message": message,
         })
         rescue_plan = orchestrator.build_rescue_plan(attempt, origin_plan, numeric_qis)
+        candidates = []
         if attempt == 1:
             rescue_plan = generator.validate_and_repair_plan(
                 rescue_plan, real_train, cols["quasi_identifiers"]
             )
-            current = generator.synthesize(
-                real_train, rescue_plan, n_rows, cols["quasi_identifiers"],
-                label_column=cols["label"], generation_order=generation_order, seed=9100 + attempt,
-            )
-            before = len(current)
-            current = generator.drop_low_dcr_rows(current, real_train, cols["quasi_identifiers"])
-            detail = f"{message} Kept {len(current)} of {before} rows."
+            # Search several deterministic seeds and DCR cutoffs. Generate a
+            # surplus first so privacy pruning still returns the requested row
+            # count. Each candidate must independently pass the full gate.
+            for percentile in (35.0, 50.0, 65.0, 75.0, 85.0):
+                for variant in range(3):
+                    seed = 9400 + int(percentile) * 10 + variant
+                    surplus_rows = max(
+                        n_rows,
+                        int(np.ceil(n_rows / (1.0 - percentile / 100.0))) + 5,
+                    )
+                    candidate = generator.synthesize(
+                        real_train, rescue_plan, surplus_rows, cols["quasi_identifiers"],
+                        label_column=cols["label"], generation_order=generation_order, seed=seed,
+                    )
+                    candidate = generator.drop_low_dcr_rows(
+                        candidate, real_train, cols["quasi_identifiers"], percentile=percentile,
+                    )
+                    if len(candidate) > n_rows:
+                        candidate = candidate.sample(n=n_rows, random_state=seed).reset_index(drop=True)
+                    candidate = generator.suppress_unique_qi_combinations(
+                        candidate, cols["quasi_identifiers"],
+                    )
+                    candidates.append((
+                        candidate,
+                        f"seed {seed}, DCR cutoff {percentile:.0f}%, singleton QIs suppressed",
+                        rescue_plan,
+                    ))
         elif attempt == 2:
-            current = generator.generalize_frame(
+            candidate = generator.generalize_frame(
                 best_synth, real_train, cols["quasi_identifiers"], cols["label"]
             )
-            detail = message
+            candidates.append((candidate, "targeted QI generalization", rescue_plan))
         else:
             rescue_plan = generator.validate_and_repair_plan(
                 rescue_plan, real_train, cols["quasi_identifiers"]
             )
-            current = generator.second_generation(
-                best_synth, rescue_plan, n_rows, cols["quasi_identifiers"],
-                label_column=cols["label"], generation_order=generation_order, seed=9300 + attempt,
-            )
-            detail = message
+            for variant in range(4):
+                seed = 9303 + variant
+                candidate = generator.second_generation(
+                    best_synth, rescue_plan, n_rows, cols["quasi_identifiers"],
+                    label_column=cols["label"], generation_order=generation_order, seed=seed,
+                )
+                candidates.append((candidate, f"second-generation seed {seed}", rescue_plan))
 
-        utility = statistician.evaluate(real_train, real_test, current, cols["label"], profile=profile)
-        attack = attacker.attack(
-            profile, real_train, real_test, current, cols["quasi_identifiers"], prior=prior,
+        # Pick the first fully passing candidate. If none pass, retain the
+        # highest deterministic outcome score as the input to the next step.
+        evaluated = []
+        for candidate, variant_detail, candidate_plan in candidates:
+            candidate_utility = statistician.evaluate(
+                real_train, real_test, candidate, cols["label"], profile=profile,
+            )
+            candidate_attack = attacker.attack(
+                profile, real_train, real_test, candidate, cols["quasi_identifiers"], prior=prior,
+            )
+            candidate_passed = orchestrator.decide(candidate_utility, candidate_attack, thresholds)
+            candidate_score = orchestrator.outcome_score(candidate_utility, candidate_attack, thresholds)
+            evaluated.append((
+                candidate_score, candidate_passed, candidate, candidate_utility,
+                candidate_attack, variant_detail, candidate_plan,
+            ))
+            if candidate_passed:
+                break
+
+        score, passed, current, utility, attack, variant_detail, rescue_plan = max(
+            evaluated, key=lambda item: (item[1], item[0]),
         )
-        passed = orchestrator.decide(utility, attack, thresholds)
-        score = orchestrator.outcome_score(utility, attack, thresholds)
+        detail = (
+            f"{message} Selected {variant_detail} after evaluating {len(evaluated)} "
+            f"deterministic candidate{'s' if len(evaluated) != 1 else ''}; kept {len(current)} rows."
+        )
         record = RescueAttempt(
             attempt=attempt,
             name=name,
@@ -347,6 +408,13 @@ def run_forge(
 ) -> ForgeResponse:
     llm.reset_llm_state()
     settings = get_settings()
+    if req.policy_source == "gemini":
+        llm.record(
+            "policy",
+            "Translate the policy sentence into release-gate numbers.",
+            settings.orchestrator_model,
+            True,
+        )
     run_id = run_id or uuid.uuid4().hex[:12]
     with _RUN_LOCK:
         _RUN_STATES.setdefault(run_id, {"status": "RUNNING", "progress": []})
@@ -363,6 +431,15 @@ def run_forge(
         _record_event(run_id, event)
         if progress:
             progress(event)
+
+    ai_seen = 0
+
+    def flush_ai() -> None:
+        nonlocal ai_seen
+        log = llm.get_run_log()
+        for item in log[ai_seen:]:
+            emit({"type": "ai_usage", **item})
+        ai_seen = len(log)
 
     # --- Ingest ---
     source = get_data_source(req.source)
@@ -408,6 +485,7 @@ def run_forge(
     emit({"type": "agent", "agent": "profiler", "message": "Analyst is inferring semantic dependencies and constraints..."})
     semantic_profile = profiler.analyze_profile(profile, req.business_rules)
     profile.semantic_profile = semantic_profile
+    flush_ai()
     emit({"type": "profiled", "profile": profile.model_dump()})
 
     # Initialize Run Blackboard
@@ -445,6 +523,18 @@ def run_forge(
             "queries": dp_model.query_names,
             "mechanism": "laplace",
         })
+        shown = ", ".join(dp_model.query_names[:8])
+        llm.advise(
+            "generator",
+            "Explain how the Laplace epsilon budget was split.",
+            (
+                "Explain this Laplace release in two sentences. No rows are included. "
+                f"Epsilon spent {dp_model.epsilon_spent:.4f} of {dp_model.epsilon_total:.4f}. "
+                f"Queries: {shown}. Later rounds redraw from this same noisy release."
+            ),
+            model=settings.generator_model,
+        )
+        flush_ai()
         emit({
             "type": "agent", "agent": "generator", "done": True,
             "message": (
@@ -595,6 +685,10 @@ def run_forge(
             "type": "agent", "agent": "orchestrator", "round": i, "done": False,
             "message": "Arbiter is verifying release thresholds against Pareto frontier...",
         })
+        # The gate check is immediate. On the live stream, hold this working
+        # state so the Arbiter card can show its highlight before the verdict.
+        if progress is not None:
+            time.sleep(1.5)
 
         evaluations: List[CandidateEvaluation] = []
         for c_idx in range(len(candidates)):
@@ -671,6 +765,9 @@ def run_forge(
             "membership_accuracy": attack.membership_accuracy,
             "generator_feedback": feedback,
         }
+        flush_ai()
+
+    flush_ai()
 
     if _is_aborted(run_id):
         _RUN_CACHE.pop(run_id, None)
@@ -706,7 +803,14 @@ def run_forge(
             prior=prior_for_attacker,
             max_rounds=max_rounds,
             best_score=best_failed_score,
+            failure_brief=(
+                f"fidelity {utility.fidelity_score}, prediction {utility.utility_ratio}, "
+                f"query {utility.query_equivalence}, re-identification {attack.re_id_rate}, "
+                f"membership {attack.membership_accuracy}, attribute inference {attack.attribute_inference_advantage}, "
+                f"linkage {attack.linkage_rate}, near-duplicate {attack.near_duplicate_rate}."
+            ),
         )
+        flush_ai()
         if healed is None:
             _RUN_CACHE.pop(run_id, None)
             aborted_resp = ForgeResponse(
@@ -771,6 +875,20 @@ def run_forge(
         pure_dp, dp_model.epsilon_spent if dp_model is not None else 0.0
     )
     scorecard += f"\n\nDIFFERENTIAL PRIVACY: {formal_dp_guarantee}"
+    if rounds and rounds[-1].utility.fairness and rounds[-1].utility.fairness.summary:
+        fairness_note = llm.advise(
+            "statistician",
+            "Explain the fairness findings without changing the release decision.",
+            (
+                "Fairness is advisory and does not block certification. "
+                f"Status: {rounds[-1].utility.fairness.status}. "
+                f"Summary: {rounds[-1].utility.fairness.summary}"
+            ),
+            model=settings.reporter_model,
+        )
+        if fairness_note:
+            scorecard += f"\n\nFAIRNESS NARRATIVE: {fairness_note}"
+        flush_ai()
     if frontier:
         optimal = sum(1 for candidate in frontier if candidate.is_pareto_optimal)
         certified_count = sum(1 for candidate in frontier if candidate.gate_passed)
@@ -808,5 +926,22 @@ def run_forge(
             certificate.issue(run_id, response.model_dump(), synth, real_train)
         except Exception:
             logger.exception("Could not issue the release certificate for %s", run_id)
+    elif not passed:
+        try:
+            failure_report.issue(
+                run_id,
+                response.model_dump(),
+                {
+                    "synthesis_mode": req.synthesis_mode,
+                    "dp_epsilon": req.dp_epsilon,
+                    "epsilon_spent": dp_model.epsilon_spent if dp_model is not None else None,
+                    "dp_queries": list(dp_model.query_names) if dp_model is not None else [],
+                    "n_rows": n_rows,
+                },
+            )
+        except Exception:
+            logger.exception("Could not issue the failure report for %s", run_id)
+    flush_ai()
+    response.ai_usage = [AIUsageStep.model_validate(item) for item in llm.get_run_log()]
     emit({"type": "done", "response": response.model_dump()})
     return response

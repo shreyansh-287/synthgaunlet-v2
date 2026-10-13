@@ -2,8 +2,9 @@
 
 Counting queries have sensitivity 1: adding or removing one person changes a
 single histogram cell by 1. Noise scale is therefore 1 / epsilon_i. Quantile
-edges and category domains are the histogram grid. Sampling more rows from the
-released noisy probabilities is post-processing and does not spend more budget.
+edges and category domains are the histogram grid. Drawing a numeric value
+inside its released bin, and drawing more rows, are post-processing and do
+not spend more budget.
 """
 
 from __future__ import annotations
@@ -18,10 +19,15 @@ from models import SynthesisConfig
 
 NO_FORMAL_DP_GUARANTEE = "No formal DP guarantee"
 _PAIR_CORR_MIN = 0.2
+_LABEL_CORR_MIN = 0.15
 _MAX_PAIRS = 4
+_MAX_LABEL_PAIRS = 4
 _MAX_CATEGORIES = 20
-_QUANTILE_BINS = 5
+_QUANTILE_BINS = 6
 _LOW_CARDINALITY = 12
+_ONE_WAY_WEIGHT = 1.0
+_PAIR_WEIGHT = 1.4
+_LABEL_PAIR_WEIGHT = 2.6
 
 
 class BudgetExceeded(ValueError):
@@ -61,16 +67,27 @@ class PrivacyBudgetAccountant:
         return amount
 
 
-def allocate_budget(epsilon_total: float, n_queries: int) -> List[float]:
+def allocate_budget(
+    epsilon_total: float,
+    n_queries: int,
+    weights: Optional[List[float]] = None,
+) -> List[float]:
     """Split a budget into n positive shares that sum to epsilon_total."""
     if n_queries < 1:
         raise ValueError("At least one query is required.")
     total = float(epsilon_total)
-    raw = np.full(n_queries, total / n_queries, dtype=float)
+    if weights is None:
+        raw_weights = np.ones(n_queries, dtype=float)
+    else:
+        if len(weights) != n_queries:
+            raise ValueError("Budget weights must match the query count.")
+        raw_weights = np.asarray(weights, dtype=float)
+        if not np.isfinite(raw_weights).all() or np.any(raw_weights <= 0):
+            raise ValueError("Budget weights must be positive.")
+    raw = raw_weights / float(raw_weights.sum()) * total
     raw[-1] = total - float(raw[:-1].sum())
     if raw[-1] <= 0:
-        raw = np.full(n_queries, total / n_queries, dtype=float)
-        raw *= total / float(raw.sum())
+        raw = raw_weights / float(raw_weights.sum()) * total
     return [float(part) for part in raw]
 
 
@@ -105,6 +122,7 @@ class DPMarginals:
     two_way: Dict[Tuple[str, str], np.ndarray]
     epsilon_total: float
     epsilon_spent: float
+    spans: Dict[str, Optional[list]] = field(default_factory=dict)
     query_names: List[str] = field(default_factory=list)
     label_column: Optional[str] = None
 
@@ -117,7 +135,8 @@ def release_plan(model: DPMarginals) -> SynthesisConfig:
         categorical_shuffle=1.0,
         copula_rank_preservation=False,
         rationale=(
-            "Laplace mechanism on 1-way marginals and high-correlation 2-way tables. "
+            "Laplace mechanism on 1-way marginals, with the label joined to its strongest columns. "
+            "Numeric values are drawn inside each released bin. "
             f"Epsilon spent {model.epsilon_spent}."
         ),
     )
@@ -184,9 +203,13 @@ def _quantile_edges(values: np.ndarray, n_bins: int) -> np.ndarray:
     return edges
 
 
-def _discretize(frame: pd.DataFrame, label_column: Optional[str]) -> tuple[pd.DataFrame, Dict[str, list]]:
+def _discretize(
+    frame: pd.DataFrame,
+    label_column: Optional[str],
+) -> tuple[pd.DataFrame, Dict[str, list], Dict[str, Optional[list]]]:
     coded = pd.DataFrame(index=frame.index)
     levels: Dict[str, list] = {}
+    spans: Dict[str, Optional[list]] = {}
     for column in frame.columns:
         series = frame[column]
         if _is_continuous(series):
@@ -197,6 +220,7 @@ def _discretize(frame: pd.DataFrame, label_column: Optional[str]) -> tuple[pd.Da
             bins = min(_QUANTILE_BINS, max(1, len(unique)))
             if bins == 1:
                 levels[column] = [float(unique[0])]
+                spans[column] = None
                 coded[column] = 0
                 continue
             edges = _quantile_edges(numeric, bins)
@@ -204,13 +228,17 @@ def _discretize(frame: pd.DataFrame, label_column: Optional[str]) -> tuple[pd.Da
             index = np.clip(index, 0, bins - 1)
             integer_source = pd.api.types.is_integer_dtype(series)
             mids = []
-            for left, right in zip(edges[:-1], edges[1:]):
+            column_spans = []
+            for bin_index, (left, right) in enumerate(zip(edges[:-1], edges[1:])):
                 mid = (left + right) / 2.0
                 mids.append(int(round(mid)) if integer_source else float(mid))
+                column_spans.append((float(left), float(right), bool(integer_source), bin_index == bins - 1))
             levels[column] = mids
+            spans[column] = column_spans
             coded[column] = index.astype(int)
             continue
         filled = _fill_missing(series)
+        spans[column] = None
         if pd.api.types.is_numeric_dtype(filled):
             column_levels = sorted(pd.unique(filled).tolist())
             mapping = {level: i for i, level in enumerate(column_levels)}
@@ -222,10 +250,10 @@ def _discretize(frame: pd.DataFrame, label_column: Optional[str]) -> tuple[pd.Da
         mapping = {level: i for i, level in enumerate(column_levels)}
         levels[column] = column_levels
         coded[column] = projected.map(mapping).astype(int)
-    return coded, levels
+    return coded, levels, spans
 
 
-def _high_correlation_pairs(coded: pd.DataFrame) -> List[Tuple[str, str, float]]:
+def _ranked_pairs(coded: pd.DataFrame) -> List[Tuple[str, str, float]]:
     if coded.shape[1] < 2:
         return []
     corr = coded.corr(numeric_only=True).fillna(0.0).abs()
@@ -237,9 +265,39 @@ def _high_correlation_pairs(coded: pd.DataFrame) -> List[Tuple[str, str, float]]
             if np.isfinite(strength):
                 pairs.append((left, right, strength))
     pairs.sort(key=lambda item: item[2], reverse=True)
-    chosen = [item for item in pairs if item[2] >= _PAIR_CORR_MIN][:_MAX_PAIRS]
+    return pairs
+
+
+def _select_pairs(coded: pd.DataFrame, label_column: Optional[str]) -> List[Tuple[str, str, float]]:
+    """Keep the label attached to its strongest columns, then fill with other strong pairs."""
+    pairs = _ranked_pairs(coded)
+    chosen: List[Tuple[str, str, float]] = []
+    seen = set()
+
+    def add(item: Tuple[str, str, float]) -> bool:
+        left, right, strength = item
+        key = tuple(sorted((left, right)))
+        if key in seen or not np.isfinite(strength) or strength <= 0 or len(chosen) >= _MAX_PAIRS:
+            return False
+        chosen.append(item)
+        seen.add(key)
+        return True
+
+    if label_column in list(coded.columns):
+        label_count = 0
+        for item in pairs:
+            if label_column not in (item[0], item[1]):
+                continue
+            if item[2] < _LABEL_CORR_MIN or label_count >= _MAX_LABEL_PAIRS:
+                break
+            if add(item):
+                label_count += 1
+    for item in pairs:
+        if len(chosen) >= _MAX_PAIRS or item[2] < _PAIR_CORR_MIN:
+            break
+        add(item)
     if not chosen and pairs and pairs[0][2] > 0:
-        chosen = pairs[:1]
+        add(pairs[0])
     return chosen
 
 
@@ -249,14 +307,18 @@ def fit_marginals(
     label_column: Optional[str] = None,
     seed: int = 0,
 ) -> DPMarginals:
-    """Release noisy 1-way marginals and high-correlation 2-way tables."""
+    """Release noisy 1-way marginals and the label's strongest 2-way tables."""
     if frame.empty or frame.shape[1] == 0:
         raise ValueError("Differential privacy synthesis needs a non-empty table.")
-    coded, levels = _discretize(frame, label_column)
-    pairs = _high_correlation_pairs(coded)
+    active_label = label_column if label_column in frame.columns else None
+    coded, levels, spans = _discretize(frame, active_label)
+    pairs = _select_pairs(coded, active_label)
     query_names = [f"1-way:{column}" for column in coded.columns]
     query_names.extend(f"2-way:{left}|{right}" for left, right, _strength in pairs)
-    shares = allocate_budget(epsilon_total, len(query_names))
+    weights = [_ONE_WAY_WEIGHT] * int(coded.shape[1])
+    for left, right, _strength in pairs:
+        weights.append(_LABEL_PAIR_WEIGHT if active_label in (left, right) else _PAIR_WEIGHT)
+    shares = allocate_budget(epsilon_total, len(query_names), weights)
     accountant = PrivacyBudgetAccountant(epsilon_total)
     rng = np.random.RandomState(seed)
 
@@ -280,8 +342,9 @@ def fit_marginals(
         two_way=two_way,
         epsilon_total=float(epsilon_total),
         epsilon_spent=accountant.spent,
+        spans=spans,
         query_names=query_names,
-        label_column=label_column if label_column in frame.columns else None,
+        label_column=active_label,
     )
 
 
@@ -309,6 +372,31 @@ def _best_parent(model: DPMarginals, column: str, assigned: Dict[str, np.ndarray
             best_mass = peak
             best_name = parent
     return best_name
+
+
+def _realize_column(model: DPMarginals, column: str, indices: np.ndarray, rng: np.random.RandomState) -> list:
+    levels = model.levels[column]
+    spans = model.spans.get(column) if model.spans else None
+    if not spans:
+        return [levels[int(i)] for i in indices]
+    values = []
+    for index in indices:
+        slot = int(index)
+        left, right, is_integer, closed_right = spans[slot]
+        if not np.isfinite(left) or not np.isfinite(right) or right <= left:
+            values.append(levels[slot])
+            continue
+        if is_integer:
+            lower = int(np.ceil(left - 1e-8))
+            upper_edge = right + 1e-8 if closed_right else right - 1e-8
+            upper = int(np.floor(upper_edge))
+            if upper < lower:
+                values.append(int(round((left + right) / 2.0)))
+            else:
+                values.append(int(rng.randint(lower, upper + 1)))
+            continue
+        values.append(float(rng.uniform(left, right)))
+    return values
 
 
 def sample(model: DPMarginals, n_rows: int, seed: int = 0) -> pd.DataFrame:
@@ -340,8 +428,8 @@ def sample(model: DPMarginals, n_rows: int, seed: int = 0) -> pd.DataFrame:
             drawn[mask] = rng.choice(len(probs), size=count, p=probs)
         assigned[column] = drawn
 
-    out = {}
-    for column in model.columns:
-        values = model.levels[column]
-        out[column] = [values[int(i)] for i in assigned[column]]
+    out = {
+        column: _realize_column(model, column, assigned[column], rng)
+        for column in model.columns
+    }
     return pd.DataFrame(out, columns=model.columns)

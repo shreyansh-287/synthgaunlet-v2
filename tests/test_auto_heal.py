@@ -3,7 +3,11 @@
 import pandas as pd
 import pytest
 
-from agents.generator import drop_low_dcr_rows, generalize_frame
+from agents.generator import (
+    drop_low_dcr_rows,
+    generalize_frame,
+    suppress_unique_qi_combinations,
+)
 from agents.orchestrator import build_rescue_plan
 from constants import DATASETS
 from models import ForgeRequest, SourceSpec, SynthesisConfig, Thresholds
@@ -62,6 +66,19 @@ def test_generalize_buckets_age_collapses_rare_categories_and_winsorizes():
     assert out["income"].min() > -500
     assert out["income"].max() < 5000
     assert set(out["outcome"]) == {0, 1}
+
+
+def test_suppress_unique_qi_combinations_keeps_rows_and_removes_singletons():
+    synth = pd.DataFrame({
+        "age": [20, 20, 30, 40],
+        "city": ["a", "a", "b", "c"],
+        "label": [0, 1, 0, 1],
+    })
+    out = suppress_unique_qi_combinations(synth, ["age", "city"])
+    counts = out.groupby(["age", "city"], dropna=False).size()
+    assert len(out) == len(synth)
+    assert counts.min() >= 2
+    assert out["label"].tolist() == synth["label"].tolist()
 
 
 def test_certification_names():
