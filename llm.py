@@ -34,7 +34,7 @@ def _get_gemini_client():
         from google import genai
         from google.genai import types
 
-        fast_http = types.HttpOptions(timeout=3000)
+        fast_http = types.HttpOptions(timeout=60000)
 
         if settings.google_genai_use_vertexai:
             _gemini_client = genai.Client(

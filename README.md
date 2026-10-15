@@ -5,297 +5,389 @@
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Google BigQuery](https://img.shields.io/badge/BigQuery-Import%20%26%20Export-669DF6?logo=google-bigquery&logoColor=white)](https://cloud.google.com/bigquery)
-[![Cloud Run Ready](https://img.shields.io/badge/Cloud%20Run-Deployed-34A853?logo=google-cloud&logoColor=white)](https://cloud.google.com/run)
+[![Differential Privacy](https://img.shields.io/badge/Privacy-Pure%20Laplace%20%CE%B5--DP-E53935?logo=shield&logoColor=white)](#pure-differential-privacy-mode)
+[![Cryptographic Audit](https://img.shields.io/badge/Audit-HMAC%20SHA--256%20Certificate-00ACC1?logo=adobe-acrobat-reader&logoColor=white)](#cryptographic-release-certificates--verification)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-**SynthGauntlet** is an enterprise-grade, adversarial multi-agent system built on **Google Cloud Vertex AI** that converts sensitive tabular datasets into high-fidelity synthetic data. The generated data is **provably useful** for downstream ML and analytics while being **provably private** against sophisticated adversarial deanonymization attacks.
+**SynthGauntlet** is an enterprise-grade, adversarial multi-agent system powered by **Google Cloud Vertex AI (`gemini-3.6-flash`)** that transforms sensitive tabular datasets into high-fidelity synthetic data. 
+
+The synthesized data is **provably useful** for downstream machine learning and analytics while being **provably private** against sophisticated adversarial re-identification, linkage, and membership inference attacks.
 
 ---
 
-## Core Principles & Design Boundaries
+## Table of Contents
+1. [Core Principles & Architectural Privacy Boundary](#core-principles--architectural-privacy-boundary)
+2. [Adversarial Multi-Agent Cast](#adversarial-multi-agent-cast)
+3. [Synthesis Modes & Engine Strategies](#synthesis-modes--engine-strategies)
+4. [PII Pre-Scan & Direct Identifier Quarantine](#pii-pre-scan--direct-identifier-quarantine)
+5. [Release Policies & Adaptive Dials](#release-policies--adaptive-dials)
+6. [Mathematical Release Gates & Fidelity Verification](#mathematical-release-gates--fidelity-verification)
+7. [Pareto Frontier & Interactive Trade-Off Slider](#pareto-frontier--interactive-trade-off-slider)
+8. [Cryptographic Release Certificates & Verification](#cryptographic-release-certificates--verification)
+9. [Google BigQuery Integration & Required IAM Roles](#google-bigquery-integration--required-iam-roles)
+10. [Local Development & Environment Setup](#local-development--environment-setup)
+11. [Production Deployment to Google Cloud Run](#production-deployment-to-google-cloud-run)
+12. [Complete REST & SSE API Reference](#complete-rest--sse-api-reference)
+13. [Repository Directory Structure](#repository-directory-structure)
+
+---
+
+## Core Principles & Architectural Privacy Boundary
 
 ```
-                 ┌──────────────────────────────────────────────┐
-                 │             PRIVACY BOUNDARY                 │
-                 │   RAW DATA ROWS NEVER SENT TO ANY LLM        │
-                 └──────────────────────┬───────────────────────┘
+ ┌─────────────────────────────────────────────────────────────────────────────┐
+ │                      ENTERPRISE DATA INGESTION                              │
+ │        CSV / Excel / Parquet Upload  ·  Samples  ·  Google BigQuery         │
+ └──────────────────────────────────────┬──────────────────────────────────────┘
                                         │
-                 Aggregated Statistics, │ Schema, Diagnostics Deltas Only
+                        Automated PII Pre-Scan & Quarantine
+                        (Mask · Drop · Salted SHA-256 Hash)
+                                        │
                                         ▼
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                              GEMINI 3.6 FLASH                                │
-│       Strategic Reasoning · Candidate Generation · Root-Cause Advice         │
-└──────────────────────────────────────┬───────────────────────────────────────┘
-                                        │ Proposed Dials & Parameters
+ ┌─────────────────────────────────────────────────────────────────────────────┐
+ │                           STRICT PRIVACY BOUNDARY                           │
+ │               RAW DATA ROWS ARE NEVER TRANSMITTED TO ANY LLM                │
+ └──────────────────────────────────────┬──────────────────────────────────────┘
+                                        │
+                 Aggregated Statistics, │ Schemas, Diagnostic Deltas Only
                                         ▼
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                           DETERMINISTIC ENGINE                               │
-│      Hierarchical Grouped Sampling · Copula Jitter · Strict Bound Clamping   │
-└──────────────────────────────────────┬───────────────────────────────────────┘
-                                        │ Candidate Synthetic Tables
+ ┌─────────────────────────────────────────────────────────────────────────────┐
+ │                     GOOGLE CLOUD VERTEX AI (GEMINI 3.6 FLASH)               │
+ │           Strategic Reasoning · Candidate Generation · Root-Cause Advice    │
+ └──────────────────────────────────────┬──────────────────────────────────────┘
+                                        │ Proposed Dials & Synthesis Plans
                                         ▼
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                        DETERMINISTIC VERIFICATION GATE                       │
-│    2-Sample KS Tests · Correlation Divergence · Nearest-Neighbor Linkage     │
-│   (Code measures. The LLM NEVER evaluates or grades its own output.)         │
-└──────────────────────────────────────────────────────────────────────────────┘
+ ┌─────────────────────────────────────────────────────────────────────────────┐
+ │                         DETERMINISTIC FORGE ENGINE                          │
+ │     Hierarchical Grouped Sampling · Copula Jitter · Pure Laplace DP Engine  │
+ └──────────────────────────────────────┬──────────────────────────────────────┘
+                                        │ Synthetic Candidate Batches
+                                        ▼
+ ┌─────────────────────────────────────────────────────────────────────────────┐
+ │                     DETERMINISTIC VERIFICATION GATES                        │
+ │     2-Sample KS Tests · ML Utility (TSTR) · Nearest-Neighbor Linkage (DCR)  │
+ │     Shadow Membership Inference (MIA) · Outlier Attribute Disclosure        │
+ │              (Code measures. The LLM NEVER grades its own work.)            │
+ └──────────────────────────────────────┬──────────────────────────────────────┘
+                                        │
+                     ┌──────────────────┴──────────────────┐
+                     ▼                                     ▼
+           PASS RELEASE GATES                     FAIL RELEASE GATES
+     ✅ Cryptographic PDF Certificate       🛑 Execution Aborted / Quarantine
+     ✅ Direct BigQuery Warehouse Export     ⚠️ Failure Diagnostic PDF Report
+     ✅ Verified Synthetic CSV Download     🔄 Optional 3-Step Auto-Heal Rescue
 ```
 
-1. **Strict Privacy Boundary**: Raw dataset records are **NEVER** transmitted to Gemini or any external model API. Only anonymized statistical summaries, covariance matrices, column schemas, and diagnostic deltas cross the boundary.
-2. **Deterministic Release Gate**: The release decision is 100% mathematical code. The LLM never self-evaluates or grades its own synthetic tables. Release gates are strictly gated by independent statistical divergence formulas and adversarial re-identification attacks.
-3. **High-Convergence Beam Search**: Proposes 3 distinct candidate plans (`high_utility`, `balanced`, `high_privacy`) along the Pareto frontier each round, guaranteeing a ~99% pass rate within a maximum of 5 iterations.
+1. **Strict Zero-Row Privacy Boundary**: Raw dataset records **never** cross the network to Gemini or any external model API. Only anonymized statistical profiles, correlation matrices, column schemas, and diagnostic deltas are processed by LLM agents.
+2. **Deterministic Mathematical Release Decisions**: LLMs propose candidate parameters and diagnose errors, but **never evaluate or approve their own output**. Release gating is strictly determined by independent statistical divergence metrics and adversarial re-identification attacks.
+3. **Multi-Candidate Beam Search**: Evaluates 3 distinct candidate strategies (`high_utility`, `balanced`, `high_privacy`) along the Pareto frontier per round, converging within bounded iterations.
 
 ---
 
-## The Adversarial Agent Cast
+## Adversarial Multi-Agent Cast
 
-| Agent | Role | Technology | Core Responsibility |
-| :--- | :--- | :--- | :--- |
-| **Semantic Profiler** | Profiler | Gemini 3.6 Flash + Math | Computes baseline statistical summaries; extracts functional dependencies, business invariants, Quasi-Identifier (QI) attack surfaces, and topological generation ordering. |
-| **Forge** | Synthesizer (Generator) | Gemini 3.6 Flash + Deterministic Code | Implements **Beam-Search Multi-Candidate Generation** proposing 3 Pareto strategies per round. Synthesizes rows using dependency-aware grouped sampling, copula rank preservation, and domain bound clamping. |
-| **Auditor** | Utility Auditor (Evaluator) | Deterministic Code (Scipy / Sklearn) | Computes 2-sample Kolmogorov-Smirnov distances, Total Variation, correlation matrix divergence ($|\Delta r| \ge 0.15$ broken relationships), SQL query equivalence, and Train-on-Synthetic Test-on-Real (TSTR) ML utility. |
-| **Challenger** | Privacy Attacker (Adversary) | Gemini 3.6 Flash + Deterministic Tools | Executes an **Adaptive Multi-Pass Tool Loop** (Pass 1 broad attack surface, Pass 2 focused adaptive follow-up) probing nearest-neighbor DCR linkage, shadow Membership Inference (MIA), and outlier attribute attacks, returning worst-case breach risk. |
-| **Arbiter** | Orchestrator (Judge) | Deterministic Release Gate + Gemini Strategy | Enforces mathematical release gates and **Pareto candidate selection**. Tracks multi-round state via a `RunBlackboard` to diagnose root causes and feed structured per-column advice to Forge. |
-
----
-
-## Mathematical Release Gates
-
-A synthetic dataset is approved for production release **only if** it simultaneously passes all utility baselines and satisfies all privacy ceilings:
-
-| Metric | Target | Formula / Methodology | Description |
+| Agent | Icon | Engine | Core Responsibility |
 | :--- | :---: | :--- | :--- |
-| **Distribution Fidelity** | **$\ge 82.0\%$** | $1 - \frac{1}{2}(\text{KS}_{\text{numeric}} + \text{TVD}_{\text{categorical}})$ | Per-column marginal distribution fidelity against real data. |
-| **TSTR ML Utility** | **$\ge 85.0\%$** | $\frac{\text{Score}_{\text{Train Synthetic, Test Real}}}{\text{Score}_{\text{Train Real, Test Real}}}$ | Gradient boosted cross-validated classification / regression score retention. |
-| **Query Equivalence** | **$\ge 95.0\%$** | $1 - \text{Mean Absolute Percentage Error}$ | Analytical SQL aggregate query match across stratified sub-groups. |
-| **Re-ID Linkage Risk** | **$\le 1.0\%$** | $\frac{\sum \mathbb{I}(\text{DCR}_{\text{synth}\to\text{real}} < \epsilon)}{\text{Total Real Records}}$ | Scaled Distance to Closest Record (DCR) nearest-neighbor re-identification rate. |
-| **Membership Inference (MIA)** | **$\le 60.0\%$** | Shadow DCR binary classifier AUC / accuracy | Accuracy of an adversary distinguishing training members from holdouts (baseline 50%). |
-| **Outlier Attribute Linkage** | **$\le 10.0\%$** | Linkage success on top 5% extreme multivariate points | Resistance to deanonymization of unique individuals in distribution tails. |
+| **Semantic Profiler** | 📋 | Gemini 3.6 Flash + Code | Computes baseline statistical profiles, infers column domains, extracts functional dependencies, Quasi-Identifier (QI) attack surfaces, sensitive attributes, and generation topological order. |
+| **Forge** | ⚗️ | Gemini 3.6 Flash + Deterministic Code | Generates 3 Pareto candidates per round using dependency-aware grouped sampling, copula rank preservation, and domain-bound clamping. |
+| **Auditor** | 📏 | Deterministic Code (Scipy / Sklearn) | Evaluates statistical distribution divergence (Kolmogorov-Smirnov + Total Variation), correlation matrix shift ($|\Delta r| \ge 0.15$), SQL aggregate query equivalence, and Train-on-Synthetic Test-on-Real (TSTR) ML utility. |
+| **Challenger** | 🕵️ | Gemini 3.6 Flash + Deterministic Tools | Conducts multi-pass adversarial attacks probing Distance to Closest Record (DCR) nearest-neighbor linkage, shadow Membership Inference (MIA), and outlier attribute disclosure. |
+| **Arbiter** | ⚖️ | Deterministic Gates + Gemini Reasoning | Evaluates release gates, marks Pareto non-dominated candidates, selects the winning table, and orchestrates the Auto-Heal rescue ladder when gates fail. |
+| **DP Engine** | 🛡️ | Pure Mathematical Code (`dp_engine.py`) | Provides formal mathematical Differential Privacy via the calibrated Laplace mechanism, tracking expended $\varepsilon$ privacy budget. |
 
 ---
 
-## Data Sources & System Boundaries
+## Synthesis Modes & Engine Strategies
 
-### Supported Ingestion Sources
-- **CSV File Upload**: Up to **50,000 rows / 15 MB**.
-- **Pre-Loaded Benchmark Datasets**: 5 domain datasets pre-packaged under `data/raw/`:
-  - `hr_attrition` (HR & Workforce Analytics)
-  - `adult_income` (Census & Financial Demographics)
-  - `health_diabetes` (Clinical & Healthcare Outcomes)
-  - `customer_finance` (Banking & Risk Scoring)
-  - `patient_demographics` (Epidemiology & Clinical Trials)
-- **Google BigQuery Direct Ingestion**:
-  - Connects to any accessible GCP project and dataset (`bigquery_client.py`).
-  - Access to all **350+ BigQuery Public Datasets** with zero-cost table sampling via the TableData API.
-  - Automatic serialization and normalization of complex nested types: `ARRAY`, `STRUCT`, `REPEATED` records, `GEOGRAPHY`, and `BYTES`.
+SynthGauntlet supports three distinct synthesis pathways tailored to enterprise requirements:
 
-### Operational Boundaries
-- **Synthetic Output Volume**: Strictly bound between **500 and 10,000 rows** ($<500$ rows degrades ML utility evaluation power).
-- **Adversarial Pass Limit**: Maximum **5 rounds** per synthesis job, driven by beam search Pareto convergence.
+### 1. Hybrid Mode (Recommended Standard)
+- Combines Gaussian Copula rank preservation, dependency-aware hierarchical grouped sampling, and multi-candidate beam search.
+- Maximizes downstream machine learning accuracy (TSTR $\ge 85\%$) while guaranteeing adversarial empirical safety.
+
+### 2. Pure Differential Privacy ($\varepsilon$-DP) Mode
+- Generates synthetic data with **formal mathematical Differential Privacy** guarantees.
+- Bounded columns are perturbed using calibrated **Laplace noise** scaled to query sensitivity $\Delta f / \varepsilon$.
+- Users configure an explicit privacy budget $\varepsilon \in [0.1, 10.0]$ (Default: $\varepsilon = 1.0$).
+- Output reports exact spent $\varepsilon$ budget and formal mathematical protection text.
+
+### 3. Auto-Heal Rescue Mode
+When a candidate narrowly misses the privacy ceiling or utility floor, the Arbiter can activate an automated **3-Step Rescue Ladder**:
+1. **Tighten**: Increases recombination shuffle and noise while raising rare category frequency thresholds.
+2. **Generalize**: Applies targeted QI bucketization, quantile binning, and low-DCR row dropping.
+3. **Second Generation**: Generates fresh candidates across 4 distinct random seeds using repaired generative blueprints.
 
 ---
 
-## Local Development & Setup
+## PII Pre-Scan & Direct Identifier Quarantine
+
+Before synthesis begins, SynthGauntlet includes an automated **PII Pre-Scan** (`pii_scanner.py`):
+- **Detected Entities**: Email addresses, US/International phone numbers, Social Security Numbers (SSN), Credit Card numbers, IP addresses, Physical street addresses, and Full names.
+- **Quarantine Actions**:
+  - **Mask**: Replaces values with standardized tokens (e.g., `user***@domain.com`, `XXX-XX-1234`).
+  - **Drop**: Completely removes the column before statistical profiling.
+  - **Salted SHA-256 Hash**: Replaces identifiers with irreversible cryptographic hashes for joinable entity resolution without data leakage.
+
+---
+
+## Release Policies & Adaptive Dials
+
+SynthGauntlet supports 3 preset policies plus **Natural Language Policy Interpretation**:
+
+| Policy | Target Audience | Fidelity Floor | TSTR ML Floor | Linkage Ceiling | MIA Ceiling |
+| :--- | :--- | :---: | :---: | :---: | :---: |
+| **Balanced** | General Analytics & ML | $\ge 82.0\%$ | $\ge 85.0\%$ | $\le 1.0\%$ | $\le 60.0\%$ |
+| **Privacy First** | Regulated Healthcare & Finance | $\ge 75.0\%$ | $\ge 78.0\%$ | $\le 0.5\%$ | $\le 55.0\%$ |
+| **Analytics First** | Internal Research & Benchmarks | $\ge 90.0\%$ | $\ge 88.0\%$ | $\le 2.0\%$ | $\le 65.0\%$ |
+
+- **Gemini Policy Translator (`/api/v1/policy/interpret`)**: Enter freeform compliance instructions (e.g., *"We need HIPAA-compliant clinical data for an external research challenge"*). Gemini translates the instruction into deterministic mathematical threshold numbers and explains the trade-offs.
+
+---
+
+## Mathematical Release Gates & Fidelity Verification
+
+A synthetic dataset is approved for production release **only if** it simultaneously passes all utility floors and stays beneath all privacy ceilings:
+
+| Release Gate | Standard Target | Formula / Methodology | Description |
+| :--- | :---: | :--- | :--- |
+| **Distribution Fidelity** | **$\ge 82.0\%$** | $1 - \frac{1}{2}(\text{KS}_{\text{numeric}} + \text{TVD}_{\text{categorical}})$ | Per-column marginal probability fidelity against original data. |
+| **TSTR ML Utility** | **$\ge 85.0\%$** | $\frac{\text{Score}_{\text{Train Synthetic, Test Real}}}{\text{Score}_{\text{Train Real, Test Real}}}$ | Gradient boosted cross-validated classification / regression retention. |
+| **Query Equivalence** | **$\ge 95.0\%$** | $1 - \text{Mean Absolute Percentage Error}$ | Analytical SQL aggregate query parity across stratified subgroups. |
+| **Re-ID Linkage Risk** | **$\le 1.0\%$** | $\frac{\sum \mathbb{I}(\text{DCR}_{\text{synth}\to\text{real}} < \epsilon)}{\text{Total Real Records}}$ | Scaled Distance to Closest Record (DCR) nearest-neighbor attack. |
+| **Membership Inference (MIA)** | **$\le 60.0\%$** | Shadow DCR binary classifier AUC | Accuracy of an adversary detecting training members vs holdouts (baseline 50%). |
+| **Outlier Attribute Linkage** | **$\le 10.0\%$** | Linkage success on top 5% multivariate tail | Resistance to deanonymization of unique individuals in distribution tails. |
+| **Attribute Inference Advantage** | **$\le 25.0\%$** | Supervised target prediction gain over mode | Probes if adversary can infer sensitive attributes knowing Quasi-Identifiers. |
+| **Auxiliary Linkage** | **$\le 15.0\%$** | Cross-join re-identification rate | Resistance against external secondary dataset correlation and joins. |
+| **Near-Duplicate Rows** | **$\le 10.0\%$** | $\frac{\text{Near Duplicates}}{\text{Total Synthetic Records}}$ | Identifies synthetic rows that too closely mirror training data (memorization ceiling). |
+
+### Visual Verification: Column Distribution Overlay (Fidelity Inspector)
+Directly integrated into the Dual Scorecard UI, the **Column Distribution Overlay** allows data practitioners to visually verify empirical alignment:
+- **Continuous Features**: 10 normalized histogram buckets across unified bounds with real vs. synthetic comparative percentage bars, Mean, Standard Deviation, and `[min, max]` range.
+- **Categorical Features**: Top categories with relative row frequencies (`% of total rows`), cardinality tracking, and tail grouping into an "Other" bucket.
+- **Interactive Selector**: Instant column switching with percentage delta ($\Delta\%$) badges to confirm marginal distribution retention without data memorization.
+
+---
+
+## Pareto Frontier & Interactive Trade-Off Slider
+
+SynthGauntlet plots every candidate evaluated across all adversarial rounds onto an interactive **Privacy–Utility Pareto Frontier**:
+- **Non-Dominated Candidates**: Highlights optimal candidate solutions where utility cannot be improved without increasing privacy risk.
+- **Interactive Trade-Off Slider**: Allows data stewards to smoothly slide between **Max Privacy** and **Max Utility** among certified candidates.
+- **Instant Table Switching (`/api/v1/forge/{run_id}/active-candidate`)**: Dynamically updates the active release table behind CSV downloads and BigQuery exports without re-running synthesis.
+
+---
+
+## Cryptographic Release Certificates & Verification
+
+Every approved dataset is sealed with an automated cryptographic audit trail:
+- **Branded 2-Page PDF Certificate (`/api/v1/certificate/{run_id}/pdf`)**:
+  - Displays all 6 release gate scores, final status, difficulty breakdown, and run metadata.
+  - Contains **SHA-256 Data Hash** of the training split and final synthetic table.
+  - Cryptographically signed with a secure **HMAC-SHA256 Audit Signature**.
+- **Tamper-Evident Verification (`/api/v1/verify`)**:
+  - Users can upload any synthetic CSV alongside its PDF Certificate to cryptographically verify data integrity and confirm that records were not tampered with post-release.
+- **Failure Diagnostics Report (`/api/v1/failure-report/{run_id}/pdf`)**:
+  - If release gates fail, generates an uncertified PDF report diagnosing exact attack breach vectors and remedial action recommendations.
+
+---
+
+## Google BigQuery Integration & Required IAM Roles
+
+SynthGauntlet integrates directly with Google Cloud BigQuery for frictionless enterprise cloud pipelines:
+
+### 1. Ingestion / Import
+- Pull tables directly from any accessible GCP project and dataset.
+- Supports **350+ BigQuery Public Datasets** with zero-cost table sampling via the TableData API.
+- Automatically unpacks complex nested types (`ARRAY`, `STRUCT`, `REPEATED` records, `GEOGRAPHY`).
+- **Required IAM Roles for Import**:
+  - Public Datasets: Zero credentials required.
+  - Private Enterprise Tables: `roles/bigquery.dataViewer` + `roles/bigquery.jobUser`.
+
+### 2. Export / Publish
+- One-click export of certified synthetic data directly into your BigQuery data warehouse.
+- Automatically sanitizes column names to comply with BigQuery naming specifications.
+- **Required IAM Roles for Export**:
+  - `roles/bigquery.dataEditor` (Dataset & Table Creation/Write) + `roles/bigquery.jobUser` (Job Execution).
+
+---
+
+## Local Development & Environment Setup
 
 ### Prerequisites
-- Python 3.10+ (or Python 3.11)
+- Python 3.10+ (Python 3.11 recommended)
 - Google Cloud SDK (`gcloud`) authenticated with Application Default Credentials (ADC)
 
-### 1. Clone & Initialize
+### 1. Clone & Set Up Virtual Environment
 ```bash
-git clone https://github.com/shreyansh-287/synthetic-data-forge.git
-cd synthetic-data-forge
+git clone https://github.com/shreyansh-287/synthgauntlet-v2.git
+cd synthgauntlet-v2
 
-# Automated Setup (Windows)
-setup.bat
-
-# Automated Setup (Linux / macOS)
-chmod +x setup.sh && ./setup.sh
-```
-
-### 2. Manual Installation
-```bash
+# Create and activate virtual environment
 python -m venv .venv
 
 # Windows
 .venv\Scripts\activate
+
 # Linux / macOS
 source .venv/bin/activate
 
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-### 3. Environment Configuration
-Create a `.env` file from the provided `.env.example`:
+### 2. Environment Configuration (`.env`)
+Create a `.env` file in the project root:
 ```env
-# Vertex AI Enterprise Mode (Recommended)
+# Google Cloud Vertex AI Configuration
+LLM_PROVIDER=gemini
 GOOGLE_GENAI_USE_VERTEXAI=true
 GCP_PROJECT=project-8cddd349-8d2f-4cad-bb1
-VERTEX_LOCATION=us-central1
+VERTEX_LOCATION=global
 
-# Model Selection (gemini-3.6-flash for high intelligence)
+# Model Selection (gemini-3.6-flash recommended for high speed & intelligence)
 GENERATOR_MODEL=gemini-3.6-flash
 ATTACKER_MODEL=gemini-3.6-flash
 ORCHESTRATOR_MODEL=gemini-3.6-flash
 REPORTER_MODEL=gemini-3.6-flash
 
-# Port Configuration
+# Port & Server Settings
 PORT=8080
 ```
 
-> **Note**: For Vertex AI, authenticate your local environment with:
+> **Note on GCP Authentication**:
+> Authenticate your local development machine with Google Cloud ADC:
 > ```bash
 > gcloud auth application-default login
 > gcloud config set project project-8cddd349-8d2f-4cad-bb1
 > ```
-> If running offline without GCP credentials, the pipeline gracefully executes using deterministic heuristics and mathematical fallbacks for all agent roles.
+> *If offline without GCP credentials, the pipeline gracefully falls back to deterministic heuristics and mathematical baselines.*
 
-### 4. Run Local Server
+### 3. Start Local Development Server
 ```bash
 python -m uvicorn main:app --host 127.0.0.1 --port 8080
 ```
 Open **http://127.0.0.1:8080** in your browser.
 
----
-
-## Verification & Testing Suite
-
-Run the full automated test suite covering enterprise architecture, privacy contracts, attack tools, and the end-to-end pipeline:
-
+### 4. Running the Test Suite
 ```bash
 # Run all tests
 python -m pytest tests/ -v
 
-# Run enterprise architecture and candidate beam-search tests
-python -m pytest tests/test_enterprise_architecture.py -v
+# Run distribution overlay unit tests
+python -m pytest tests/test_distribution.py -v
 
-# Run privacy attack tools & DCR verification tests
-python -m pytest tests/test_attack_tools.py -v
+# Run Pareto frontier trade-off tests
+python -m pytest tests/test_pareto.py -v
 
-# Run contract & release gate tests
-python -m pytest tests/test_synthgauntlet_contracts.py -v
+# Run Auto-Heal rescue ladder tests
+python -m pytest tests/test_auto_heal.py -v
 
-# Run full end-to-end synthesis pipeline test
-python -m pytest tests/test_pipeline.py -v
+# Run BigQuery authentication and export tests
+python -m pytest tests/test_bq_auth.py tests/test_bq_export.py -v
 ```
 
 ---
 
 ## Production Deployment to Google Cloud Run
 
-SynthGauntlet is optimized for deployment on **Google Cloud Run** with high-throughput multi-agent execution and BigQuery export capabilities.
+SynthGauntlet is built container-first and ready for automated deployment to **Google Cloud Run**:
 
-### 1. Set Active Project & Permissions
 ```bash
-# Set project
-gcloud config set project project-8cddd349-8d2f-4cad-bb1
-
-# Enable required Google Cloud APIs
+# 1. Enable required GCP services
 gcloud services enable run.googleapis.com \
                        cloudbuild.googleapis.com \
                        artifactregistry.googleapis.com \
                        aiplatform.googleapis.com \
                        bigquery.googleapis.com
-```
 
-Ensure the Cloud Run default compute service account has the following IAM roles:
-- `roles/aiplatform.user` (Vertex AI API invocation)
-- `roles/bigquery.dataEditor` (Writing synthetic tables to BigQuery)
-- `roles/bigquery.jobUser` (Executing BigQuery query and export jobs)
-
-### 2. Automated Build & Deploy (Recommended)
-Use the included automated deployment script:
-```bash
+# 2. Deploy using included deployment script
 chmod +x deploy.sh
 ./deploy.sh
 ```
 
-### 3. Manual Cloud Run Build & Deploy
-```bash
-# 1. Build & Push Container Image via Cloud Build
-gcloud builds submit \
-  --tag us-central1-docker.pkg.dev/project-8cddd349-8d2f-4cad-bb1/cloud-run-source-deploy/synthgauntlet:v2.0.14 .
-
-# 2. Deploy Service to Cloud Run
-gcloud run deploy synthgauntlet \
-  --image us-central1-docker.pkg.dev/project-8cddd349-8d2f-4cad-bb1/cloud-run-source-deploy/synthgauntlet:v2.0.14 \
-  --platform managed \
-  --region us-central1 \
-  --allow-unauthenticated \
-  --memory 4Gi \
-  --cpu 2 \
-  --timeout 600s \
-  --min-instances 0 \
-  --max-instances 5 \
-  --set-env-vars "GOOGLE_GENAI_USE_VERTEXAI=true,GCP_PROJECT=project-8cddd349-8d2f-4cad-bb1,VERTEX_LOCATION=us-central1,GENERATOR_MODEL=gemini-3.6-flash,ATTACKER_MODEL=gemini-3.6-flash,ORCHESTRATOR_MODEL=gemini-3.6-flash,REPORTER_MODEL=gemini-3.6-flash,GOOGLE_CLIENT_ID=845643368139-kjafc7tpu1eus9cfg12jm6gulue4cue3.apps.googleusercontent.com"
-```
-
-### 4. Verify Live Cloud Run Service
-Once deployed, check service liveness:
-```bash
-curl -f https://synthgauntlet-845643368139.us-central1.run.app/health
-```
-Expected response:
-```json
-{"status":"healthy","llm_enabled":true,"version":"2.0.14"}
-```
-
 ---
 
-## API Reference
+## Complete REST & SSE API Reference
 
-| Method | Path | Request Body / Query Params | Description |
+| Method | Endpoint | Request Body / Query | Description |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/health` | — | Liveness probe and Vertex AI status. |
-| `GET` | `/api/v1/datasets` | — | Catalog of pre-loaded benchmark datasets and schema profiles. |
-| `GET` | `/api/v1/history` | — | Historical synthesis runs metadata for the sidebar. |
-| `POST` | `/api/v1/history` | `HistoryItem` JSON | Persists a completed synthesis run to history storage. |
-| `DELETE`| `/api/v1/history` | — | Clears all persistent history sessions. |
-| `GET` | `/api/v1/bq/datasets` | `?project_id=...` | Lists BigQuery datasets accessible to the current session. |
-| `GET` | `/api/v1/bq/tables` | `?project_id=...&dataset_id=...` | Lists tables within a specified BigQuery dataset. |
-| `POST` | `/api/v1/bq/import` | `{project_id, dataset_id, table_id, max_rows}` | Imports and normalizes a sample table from BigQuery. |
-| `POST` | `/api/v1/upload` | Multipart form `file` | Uploads, validates, and profiles a user CSV file. |
-| `GET` | `/api/v1/forge/stream` | `?mode=...&dataset=...&n_rows=...` | Server-Sent Events (SSE) live adversarial rounds stream. |
+| `GET` | `/health` | — | Service health check, Vertex AI connectivity & token counters. |
+| `GET` | `/api/v1/tokens` | — | Real-time LLM token usage and call telemetry. |
+| `GET` | `/api/v1/datasets` | — | Catalog of pre-loaded benchmark sample datasets. |
+| `GET` | `/api/v1/sample/profile` | `?dataset=...` | Schema and statistical profile of a benchmark sample. |
+| `POST` | `/api/v1/upload` | Multipart `file` | Uploads, validates, and profiles a user CSV/tabular file. |
+| `POST` | `/api/v1/scan-pii` | `{upload_id}` | Scans uploaded dataset for direct PII identifiers. |
+| `POST` | `/api/v1/apply-pii` | `{upload_id, actions}` | Applies Mask, Drop, or Salted Hash actions to PII columns. |
+| `GET` | `/api/v1/policy/presets` | — | Retrieves preset release policies and thresholds. |
+| `POST` | `/api/v1/policy/interpret` | `{policy_text}` | Gemini-powered natural language policy translation. |
+| `POST` | `/api/v1/start-run` | `ForgeRequest` JSON | Initiates asynchronous multi-agent adversarial synthesis run. |
+| `GET` | `/api/v1/forge/stream` | `?run_id=...&n_rows=...` | Server-Sent Events (SSE) real-time round-by-round stream. |
 | `POST` | `/api/v1/forge/abort` | `{run_id}` | Immediately terminates an active synthesis run. |
-| `GET` | `/api/v1/export/{run_id}` | — | Downloads the generated synthetic CSV file. |
-| `POST` | `/api/v1/bq/export` | `{run_id, destination_project, dataset_id, table_id}` | Exports the synthetic dataset to a BigQuery destination table. |
+| `GET` | `/api/v1/status/{run_id}` | — | Polls run status, agent progress events, and partial scores. |
+| `GET` | `/api/v1/runs/{run_id}` | — | Retrieves full persisted `ForgeResponse` JSON result. |
+| `POST` | `/api/v1/runs/{run_id}` | `ForgeResponse` JSON | Persists full run result to local storage. |
+| `GET` | `/api/v1/history` | — | Lists historical synthesis sessions for sidebar restoration. |
+| `POST` | `/api/v1/forge/{run_id}/active-candidate`| `{candidate_id}` | Switches active release candidate along the Pareto frontier. |
+| `GET` | `/api/v1/export/{run_id}` | `?format=csv&candidate_id=...` | Downloads certified synthetic CSV file. |
+| `GET` | `/api/v1/certificate/{run_id}/pdf` | — | Downloads 2-page cryptographic PDF release certificate. |
+| `POST` | `/api/v1/verify` | Multipart `csv_file` + `pdf_file` | Cryptographically verifies synthetic data against certificate HMAC. |
+| `GET` | `/api/v1/failure-report/{run_id}/pdf` | — | Downloads uncertified failure diagnostics report PDF. |
+| `GET` | `/api/v1/bq/datasets` | `?project_id=...` | Lists BigQuery datasets accessible via user OAuth token. |
+| `GET` | `/api/v1/bq/tables` | `?project_id=...&dataset_id=...` | Lists tables within a specified BigQuery dataset. |
+| `POST` | `/api/v1/bq/import` | `{project_id, dataset_id, table_id}` | Imports sample table from BigQuery into SynthGauntlet. |
+| `POST` | `/api/v1/bq/export` | `{run_id, project_id, dataset_id, table_id}` | Directly exports certified synthetic data to a BigQuery table. |
 
 ---
 
-## Repository Structure
+## Repository Directory Structure
 
 ```
-synthetic-data-forge/
+synthgauntlet-v2/
 ├── agents/
 │   ├── attack_tools.py          # Deterministic privacy attack implementations (DCR, MIA, Outlier)
-│   ├── attacker.py              # Challenger: Adaptive multi-pass attack agent
-│   ├── generator.py             # Forge: Multi-candidate beam-search synthesizer
-│   ├── orchestrator.py          # Arbiter: Pareto candidate selector & release gate judge
-│   ├── profiler.py              # Semantic Profiler: Dependency & schema analyst
-│   └── statistician.py          # Auditor: KS-test, correlation divergence, TSTR utility
+│   ├── attacker.py              # Challenger: Adaptive multi-pass privacy attack agent
+│   ├── dp_engine.py             # Pure Laplace Differential Privacy engine & epsilon accounting
+│   ├── generator.py             # Forge: Multi-candidate beam-search tabular synthesizer
+│   ├── orchestrator.py          # Arbiter: Pareto candidate selector, release gate & Auto-Heal
+│   ├── profiler.py              # Semantic Profiler: Dependency, schema & attack surface analyst
+│   └── statistician.py          # Auditor: KS-test, correlation divergence, TSTR ML benchmark
 ├── data/
-│   ├── raw/                     # Pre-loaded benchmark raw datasets (.csv)
-│   └── synthetic/               # Destination for exported synthetic outputs
+│   ├── raw/                     # Pre-loaded benchmark raw datasets (Adult, Diabetes, etc.)
+│   ├── run_results/             # Persistent JSON storage for historical runs
+│   └── output/                  # Temporary cache for exported synthetic CSVs
 ├── static/
-│   └── index.html               # Single-Page Application UI (Tailwind + SSE + History + Docs)
+│   ├── index.html               # Single-Page Application UI (Tailwind, Chart.js, SSE, Modals)
+│   ├── synthgauntlet-logo.png   # Application branding asset
+│   └── synthgauntlet-banner-bg.png
 ├── tests/
+│   ├── test_ai_usage.py         # AI usage tracking & token accounting tests
 │   ├── test_attack_tools.py     # Unit tests for privacy attack algorithms
-│   ├── test_enterprise_architecture.py # Multi-candidate & semantic profiler tests
+│   ├── test_auto_heal.py        # Automated rescue ladder & candidate repair tests
+│   ├── test_bq_auth.py          # BigQuery OAuth & token handling tests
+│   ├── test_bq_export.py        # BigQuery table export & column sanitization tests
+│   ├── test_distribution.py     # Column Distribution Overlay & histogram tests
+│   ├── test_dp_engine.py        # Pure Laplace DP mechanism tests
+│   ├── test_pareto.py           # Pareto frontier candidate switching & skyline tests
 │   ├── test_pipeline.py         # End-to-end pipeline convergence tests
-│   └── test_synthgauntlet_contracts.py # Core schema & boundary contract tests
-├── bigquery_client.py           # Google BigQuery TableData sampling & export engine
-├── config.py                    # Pydantic Settings & environment loader
-├── deploy.sh                    # Automated Google Cloud Run build & deploy script
-├── Dockerfile                   # Production container definition (Python 3.11-slim)
-├── llm.py                       # Vertex AI GenAI SDK client, retries, & structured output
-├── main.py                      # FastAPI REST application & SSE routes
-├── models.py                    # Pydantic data schemas, blackboard memory, & contracts
-├── pipeline.py                  # Core 4-agent adversarial orchestration loop
-├── requirements.txt             # Production Python package dependencies
-└── setup.bat / setup.sh         # Cross-platform development bootstrapping scripts
+│   └── test_synthgauntlet_contracts.py # Data contracts, bounds & schema tests
+├── bigquery_client.py           # Google BigQuery TableData API & export client
+├── certificate.py               # Branded 2-page cryptographic PDF audit certificate generator
+├── failure_report.py            # Uncertified failure diagnostics PDF report generator
+├── pii_scanner.py               # Direct PII entity scanner (Mask, Drop, Salted Hash)
+├── reporter.py                  # Dual Scorecard builder, Pareto calculations & CSV exporter
+├── data_source.py               # Ingestion abstraction layer (CSV, Samples, BigQuery)
+├── config.py                    # Pydantic Settings & environment variable configuration
+├── llm.py                       # Vertex AI GenAI SDK client, AFC, tokens & timeout handling
+├── models.py                    # Pydantic V2 data contracts, schemas & Blackboard models
+├── pipeline.py                  # Core adversarial orchestration loop & distribution engine
+├── main.py                      # FastAPI REST application, SSE routes & lifecycle handlers
+├── requirements.txt             # Production Python dependencies
+├── Dockerfile                   # Cloud Run container definition (Python 3.11-slim)
+└── deploy.sh                    # Automated Google Cloud Run build & deploy script
 ```
 
 ---
 
 ## License
 
-This project is licensed under the Apache 2.0 License.
+This project is licensed under the Apache 2.0 License. See the [LICENSE](LICENSE) file for details.

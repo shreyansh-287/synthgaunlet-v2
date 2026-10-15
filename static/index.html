@@ -1048,6 +1048,49 @@
           <div id="fairnessCards" class="grid sm:grid-cols-2 gap-3"></div>
         </div>
 
+        <!-- Real vs. Synthetic Column Distribution Overlay -->
+        <div id="distributionSection" class="hidden bg-slate-900/90 rounded-3xl border border-slate-800 shadow-xl p-6 space-y-5">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-base font-extrabold text-slate-100">Column Distribution Overlay</span>
+                <span class="text-[10px] px-2.5 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 font-semibold border border-cyan-500/30 uppercase tracking-wider">Fidelity Inspector</span>
+              </div>
+              <p class="mt-1 text-xs text-slate-400">Compare empirical distributions of the real training split against generated synthetic data.</p>
+            </div>
+            <!-- Column Selector & Legend -->
+            <div class="flex flex-wrap items-center gap-4">
+              <div class="flex items-center gap-3 text-xs bg-slate-950/80 px-3 py-1.5 rounded-xl border border-slate-800">
+                <span class="inline-flex items-center gap-1.5 text-slate-300 font-medium">
+                  <span class="w-2.5 h-2.5 rounded-full bg-sky-400 inline-block shadow-sm shadow-sky-400/50"></span> Real Data
+                </span>
+                <span class="inline-flex items-center gap-1.5 text-slate-300 font-medium">
+                  <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block shadow-sm shadow-emerald-400/50"></span> Synthetic Data
+                </span>
+              </div>
+              <div class="flex items-center gap-2">
+                <label for="distColSelect" class="text-xs text-slate-400 font-bold uppercase tracking-wider">Column:</label>
+                <select id="distColSelect" onchange="onDistColChange()" class="bg-slate-950 text-slate-200 font-mono text-xs rounded-xl px-3 py-1.5 border border-slate-700 hover:border-cyan-500/50 focus:outline-none focus:border-cyan-500 transition-colors cursor-pointer shadow-inner">
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Column Summary Stats & Metadata -->
+          <div id="distStatsBar" class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          </div>
+
+          <!-- Distribution Chart Container -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between text-[11px] text-slate-400 font-semibold px-2">
+              <span>BIN / CATEGORY</span>
+              <span class="hidden sm:inline">RELATIVE FREQUENCY (% OF TOTAL ROWS)</span>
+            </div>
+            <div id="distChartContainer" class="space-y-2">
+            </div>
+          </div>
+        </div>
+
         <!-- Plain-English Verdict Banner -->
         <div id="verdictBanner" class="rounded-3xl p-6 border shadow-2xl">
           <div class="flex flex-col sm:flex-row sm:items-center gap-5">
@@ -1063,52 +1106,63 @@
               </div>
             </div>
             <!-- Actions Stack -->
-            <div class="flex flex-col gap-2 shrink-0 w-full sm:w-60">
+            <div class="flex flex-col gap-2 shrink-0 w-full sm:w-64">
+              <!-- Blocked warning (shown only on release failure) -->
               <div id="downloadBlocked" class="hidden rounded-xl border border-rose-500/40 bg-rose-500/10 px-3 py-2.5 text-left">
                 <p class="text-[11px] font-extrabold text-rose-200">This file is not fit to download</p>
                 <ul id="downloadBlockedReasons" class="mt-1.5 space-y-1 text-[11px] leading-snug text-rose-100/90 list-disc pl-4"></ul>
               </div>
+
+              <!-- Failure report (shown only on release failure) -->
               <a id="failureReportBtn" href="#" download
-                 class="hidden w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-400/40 text-rose-100 font-bold text-xs shadow-sm transition text-center">
+                 class="hidden w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-400/50 hover:border-rose-400 text-rose-100 font-extrabold text-xs shadow-md shadow-rose-500/15 transition transform hover:-translate-y-0.5 text-center">
                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                 <span>Download failure report</span>
               </a>
+
+              <!-- 1. Download Synthetic CSV (Primary Deliverable - Vibrant Emerald) -->
               <a id="topDownloadBtn" href="#" download
-                 class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs shadow-md shadow-emerald-500/20 transition transform hover:-translate-y-0.5 text-center">
+                 class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs shadow-md shadow-emerald-500/25 transition transform hover:-translate-y-0.5 text-center">
                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                 <span>Download Synthetic CSV</span>
               </a>
+
+              <!-- 2. Download Certificate (Cryptographic PDF - Royal Purple) -->
+              <a id="certificatePdfBtn" href="#" download
+                 class="hidden w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600/25 hover:bg-purple-600/35 border border-purple-500/40 hover:border-purple-400 text-purple-200 hover:text-white font-bold text-xs shadow-sm shadow-purple-500/10 transition transform hover:-translate-y-0.5 text-center">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                <span>Download certificate</span>
+              </a>
+
+              <!-- 3. View Full Technical Report (Deterministic Scorecard - Electric Cyan) -->
+              <button id="viewTechnicalReportBtn" type="button" onclick="openTechnicalReportModal()"
+                 class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-600/20 hover:bg-cyan-600/35 border border-cyan-500/40 hover:border-cyan-400 text-cyan-200 hover:text-white font-bold text-xs shadow-sm shadow-cyan-500/10 transition transform hover:-translate-y-0.5 text-center cursor-pointer">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                <span>View Full Technical Report</span>
+              </button>
+
+              <!-- 4. Check Certificate (Interactive Cryptographic Verification - Warm Amber) -->
+              <button id="verifyCertificateBtn" type="button" onclick="openVerifyModal()"
+                 class="hidden w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/40 hover:border-amber-400 text-amber-200 hover:text-white font-semibold text-xs shadow-sm transition transform hover:-translate-y-0.5 text-center cursor-pointer">
+                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                <span>Check certificate</span>
+              </button>
+
+              <!-- 5. Export to BigQuery (GCP Data Warehouse - Google Cloud Blue) -->
               <button id="topBqExportBtn" type="button" onclick="openBqExportModal()"
-                 class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 hover:border-blue-400 text-blue-300 hover:text-white font-bold text-xs shadow-sm transition transform hover:-translate-y-0.5 text-center cursor-pointer">
+                 class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 hover:border-blue-400 text-blue-200 hover:text-white font-bold text-xs shadow-sm transition transform hover:-translate-y-0.5 text-center cursor-pointer">
                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 7v10c0 2.21 3.58 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.58 4 8 4s8-1.79 8-4M4 7c0-2.21 3.58-4 8-4s8 1.79 8 4m0 5c0 2.21-3.58 4-8 4s-8-1.79-8-4"/></svg>
                 <span>Export to BigQuery</span>
               </button>
-              <a id="certificatePdfBtn" href="#" download
-                 class="hidden w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 hover:border-indigo-400 text-indigo-200 hover:text-white font-bold text-xs shadow-sm transition text-center">
-                <span>Download certificate</span>
-              </a>
-              <button id="verifyCertificateBtn" type="button" onclick="openVerifyModal()"
-                 class="hidden w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/80 hover:border-slate-600 text-slate-300 hover:text-slate-100 font-semibold text-xs transition text-center cursor-pointer">
-                <span>Check certificate</span>
-              </button>
+
+              <!-- 6. Start New Analysis (Reset Flow - Sleek Neutral Slate) -->
               <button id="newAnalysisBtn" onclick="startNewAnalysis()"
-                 class="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/80 hover:border-slate-600 text-slate-400 hover:text-slate-200 font-semibold text-xs transition text-center cursor-pointer">
+                 class="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/80 hover:border-slate-500 text-slate-300 hover:text-white font-semibold text-xs transition text-center cursor-pointer">
                 <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M3 12a9 9 0 019-9 9.75 9.75 0 016.74 2.74L21 8M21 3v5h-5M21 12a9 9 0 01-9 9 9.75 9.75 0 01-6.74-2.74L3 16M3 21v-5h5"/></svg>
                 <span>Start New Analysis</span>
               </button>
             </div>
           </div>
-        </div>
-
-        <!-- Technical log (collapsed) -->
-        <div class="p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-slate-900/90 border border-slate-800 shadow-xl">
-          <details>
-            <summary class="cursor-pointer text-xs font-semibold text-slate-400 hover:text-slate-200 flex items-center gap-2 select-none">
-              <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-              View Full Technical Report
-            </summary>
-            <pre id="scorecardText" class="mt-4 p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-950 text-xs font-mono text-slate-300 leading-relaxed overflow-x-auto border border-slate-800"></pre>
-          </details>
         </div>
       </section>
 
@@ -1141,6 +1195,50 @@
         <button id="abortConfirmBtn" onclick="confirmAbortRun()" type="button"
                 class="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-lg shadow-rose-600/30 transition flex items-center justify-center gap-1.5 cursor-pointer text-center">
           <span>🛑</span> Yes, Abort Run
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Full Technical Report Modal -->
+  <div id="technicalReportModal" onclick="if(event.target===this) closeTechnicalReportModal()" class="fixed inset-0 top-0 left-0 right-0 bottom-0 w-screen h-screen z-[9999] flex items-center justify-center bg-slate-950/80 backdrop-blur-md hidden fade-in p-3 sm:p-4 md:p-6">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8 max-w-4xl w-full shadow-2xl space-y-4 sm:space-y-6 relative max-h-[88vh] sm:max-h-[90vh] flex flex-col modal-card overflow-hidden">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3.5 sm:pb-4 shrink-0 gap-2">
+        <div class="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+          <span class="text-xl sm:text-2xl shrink-0">📊</span>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <h3 class="text-sm sm:text-base font-extrabold text-slate-100 leading-tight">Full Technical Report & Verification Log</h3>
+              <span class="text-[9px] sm:text-[10px] px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-mono border border-cyan-500/30 uppercase tracking-wider font-bold">Deterministic Scorecard</span>
+            </div>
+            <p class="text-[11px] sm:text-xs text-slate-400 mt-0.5 font-medium truncate">Statistical distributions, privacy attack metrics, and release gate diagnostics.</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <button id="copyScorecardBtn" onclick="copyScorecardText()" type="button" title="Copy report text"
+                  class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center gap-1.5 text-xs font-semibold transition border border-slate-700 cursor-pointer">
+            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+            <span id="copyScorecardLabel">Copy</span>
+          </button>
+          <button onclick="closeTechnicalReportModal()" type="button" title="Close report"
+                  class="h-8 w-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white grid place-items-center text-sm font-bold shrink-0 transition cursor-pointer">
+            ✕
+          </button>
+        </div>
+      </div>
+
+      <!-- Modal Body (Scrollable Preformatted Text) -->
+      <div class="overflow-y-auto overscroll-contain scroll pr-1 flex-1 min-h-0 text-xs">
+        <pre id="scorecardText" class="p-3.5 sm:p-5 rounded-xl sm:rounded-2xl bg-slate-950 text-xs font-mono text-slate-300 leading-relaxed overflow-x-auto border border-slate-800/80 select-text whitespace-pre-wrap"></pre>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="flex items-center justify-between border-t border-slate-800 pt-3.5 sm:pt-4 shrink-0">
+        <span class="text-[10px] sm:text-[11px] text-slate-500 font-mono flex items-center gap-1">🔒 <span>Cryptographically Signed Log</span></span>
+        <button onclick="closeTechnicalReportModal()" type="button"
+                class="px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition cursor-pointer">
+          Close Report
         </button>
       </div>
     </div>
@@ -1286,16 +1384,16 @@
 
   <!-- Help & Documentation Modal -->
   <div id="helpModal" onclick="if(event.target===this) closeHelpModal()" class="fixed inset-0 top-0 left-0 right-0 bottom-0 w-screen h-screen z-[9999] flex items-center justify-center bg-slate-950/80 backdrop-blur-md hidden fade-in p-3 sm:p-6">
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-7 max-w-2xl w-full max-h-[88vh] sm:max-h-[85vh] flex flex-col shadow-2xl space-y-4 sm:space-y-5 relative overflow-hidden modal-card">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-7 max-w-3xl w-full max-h-[88vh] sm:max-h-[85vh] flex flex-col shadow-2xl space-y-4 sm:space-y-5 relative overflow-hidden modal-card">
       <!-- Modal Header -->
       <div class="flex items-center justify-between pb-3.5 sm:pb-4 border-b border-slate-800 shrink-0 gap-2">
         <div class="flex items-center gap-2.5 sm:gap-3 min-w-0">
           <div class="h-9 w-9 sm:h-10 sm:w-10 rounded-xl sm:rounded-2xl bg-indigo-500/10 text-indigo-400 grid place-items-center font-bold text-lg sm:text-xl border border-indigo-500/20 shrink-0">
-            📚
+            📖
           </div>
           <div class="min-w-0">
-            <h3 class="text-sm sm:text-lg font-extrabold text-slate-100 leading-tight truncate">SynthGauntlet Docs</h3>
-            <p class="text-[11px] sm:text-xs text-slate-400 truncate">Multi-agent privacy & utility guide</p>
+            <h3 class="text-sm sm:text-lg font-extrabold text-slate-100 leading-tight truncate">SynthGauntlet — User Guide & Documentation</h3>
+            <p class="text-[11px] sm:text-xs text-slate-400 truncate">Feature walkthrough, synthesizer selection guide & release standards</p>
           </div>
         </div>
         <button type="button" onclick="closeHelpModal()" title="Close documentation"
@@ -1304,334 +1402,520 @@
         </button>
       </div>
 
+      <!-- Quick Navigation Header -->
+      <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] font-semibold text-slate-400 shrink-0 scroll">
+        <a href="#guide-overview" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white shrink-0 transition">Overview</a>
+        <a href="#guide-import" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white shrink-0 transition">1. Ingest Data</a>
+        <a href="#guide-config" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white shrink-0 transition">2. Synthesizer Modes</a>
+        <a href="#guide-forge" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white shrink-0 transition">3. Multi-Agent Cast</a>
+        <a href="#guide-duel-table" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white shrink-0 transition">4. Duel Rounds Table</a>
+        <a href="#guide-pareto" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white shrink-0 transition">5. Pareto Frontier Chart</a>
+        <a href="#guide-scorecard" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white shrink-0 transition">6. Dual Scorecard</a>
+        <a href="#guide-distributions" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white shrink-0 transition">7. Column Distributions</a>
+        <a href="#guide-outputs" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white shrink-0 transition">8. Deliverables & Actions</a>
+        <a href="#guide-metrics" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white shrink-0 transition">9. Release Gates Appendix</a>
+      </div>
+
       <!-- Modal Body (Scrollable) -->
-      <div class="overflow-y-auto overscroll-contain scroll pr-2 space-y-5 flex-1 text-xs text-slate-300">
+      <div class="overflow-y-auto overscroll-contain scroll pr-2 space-y-6 flex-1 text-xs text-slate-300">
         
-        <!-- Privacy Boundary & Zero-Leakage Guarantee -->
-        <div class="bg-indigo-950/40 p-4 sm:p-5 rounded-2xl border border-indigo-500/30 space-y-2.5 shadow-inner">
+        <!-- SECTION 1: WHAT DOES SYNTHGAUNTLET DO -->
+        <div id="guide-overview" class="bg-indigo-950/30 p-4 sm:p-5 rounded-2xl border border-indigo-500/30 space-y-2.5">
           <div class="flex items-center justify-between">
             <h4 class="font-extrabold text-indigo-300 text-sm flex items-center gap-2">
-              <span>🛡️</span> Privacy Boundary & Security Guarantees
+              <span>🛡️</span> What does SynthGauntlet do?
             </h4>
-            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-200 border border-indigo-500/40">Technical Controls</span>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-200 border border-indigo-500/40">Core Mission</span>
           </div>
-          <p class="leading-relaxed text-slate-300 text-[11px]">
-            • <strong>Zero Raw Row Transmission</strong>: Sensitive raw records are <em>NEVER</em> passed to any LLM prompt. Only anonymized statistical aggregates, column marginals, covariance matrices, and diagnostic deltas reach Gemini.<br>
-            • <strong>Deterministic Verification Gate</strong>: The LLM never grades its own work. All release gates, Kolmogorov-Smirnov distances, and attack breach metrics are computed 100% deterministically by mathematical code.
+          <p class="leading-relaxed text-slate-300 text-xs">
+            SynthGauntlet transforms sensitive, regulated datasets (customer analytics, healthcare records, financial metrics) into <strong>privacy-preserved synthetic datasets</strong>. The generated data looks, computes, and trains machine learning models exactly like real data—while guaranteeing that <strong>no real person can be re-identified or leaked</strong>.
           </p>
+          <div class="grid sm:grid-cols-3 gap-2.5 pt-1 text-[11px]">
+            <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
+              <span class="font-bold text-emerald-400">📊 High Analytical Utility</span>
+              <p class="text-slate-400 mt-0.5">Preserves multivariate correlations, statistical distributions, and high ML model accuracy (TSTR &ge; 85%).</p>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
+              <span class="font-bold text-rose-400">🕵️ Attacked Before Release</span>
+              <p class="text-slate-400 mt-0.5">Actively stress-tested by an AI adversary using linkage, nearest-neighbor, and membership inference attacks.</p>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
+              <span class="font-bold text-purple-400">📜 Cryptographic Audit Seal</span>
+              <p class="text-slate-400 mt-0.5">Every approved release receives an HMAC-signed tamper-evident PDF certificate for compliance verification.</p>
+            </div>
+          </div>
         </div>
 
-        <!-- Quick Start Guide -->
-        <div class="bg-slate-950/60 p-4 sm:p-5 rounded-2xl border border-slate-800/80 space-y-2.5">
-          <h4 class="font-extrabold text-indigo-400 text-sm flex items-center gap-2">
-            <span>🚀</span> How to Use SynthGauntlet
-          </h4>
-          <ol class="list-decimal list-inside space-y-1.5 leading-relaxed text-slate-300 text-[11px]">
-            <li><strong>Import Data</strong>: Upload CSV, TSV, XLSX, JSON, JSONL, or Parquet (up to 50,000 rows / 15 MB), connect BigQuery, or select a benchmark sample. Delimiters and nested JSON objects are normalized automatically.</li>
-            <li><strong>Remediate PII</strong>: If the deterministic pre-scan finds likely direct identifiers, choose Mask, Drop, Salted Hash, or seeded synthetic replacement before profiling.</li>
-            <li><strong>Inspect & Configure Columns</strong>: Confirm the inferred label, quasi-identifiers, output row count, synthesis engine, and release policy.</li>
-            <li><strong>Forge & Attack</strong>: Launch the adversarial loop and watch Forge, Auditor, Challenger, and Arbiter evaluate multiple candidates over successive rounds.</li>
-            <li><strong>Review the Scorecard</strong>: Inspect every utility and privacy gate, the Pareto frontier, differential-privacy statement, policy used, and fairness warnings.</li>
-            <li><strong>Release & Verify</strong>: A certified run enables CSV and certificate downloads plus BigQuery export. Use <em>Check certificate</em> with the CSV and certificate PDF to detect any later change. If the gate fails, download the failure report PDF for the exact metrics and engine analysis. The CSV stays unavailable.</li>
-          </ol>
-        </div>
-
-        <!-- The Adversarial Agent Cast -->
-        <div class="space-y-3">
+        <!-- SECTION 2: FEATURE 1 - DATA INGESTION -->
+        <div id="guide-import" class="bg-slate-950/60 p-4 sm:p-5 rounded-2xl border border-slate-800/80 space-y-3">
           <div class="flex items-center justify-between">
-            <h4 class="font-extrabold text-slate-100 text-sm flex items-center gap-2">
-              <span>🤖</span> The Adversarial Agent Cast
+            <h4 class="font-extrabold text-cyan-300 text-sm flex items-center gap-2">
+              <span>📥</span> Step 1: Choose or Upload Your Dataset
             </h4>
-            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/30">Google Cloud Vertex AI & Deterministic Math</span>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">Data Ingestion</span>
           </div>
-          <div class="grid sm:grid-cols-2 gap-3">
-            <div class="p-3.5 rounded-2xl bg-slate-950/50 border border-indigo-500/20 hover:border-indigo-500/40 transition">
-              <div class="flex items-center justify-between">
-                <p class="font-bold text-indigo-400 text-xs">⚗️ Forge (Synthesizer)</p>
-                <span class="text-[9px] font-mono text-indigo-300/70 bg-indigo-500/10 px-1.5 py-0.5 rounded">Generator</span>
+          <p class="text-slate-300 text-xs leading-relaxed">
+            You can load data into SynthGauntlet using any of three convenient options:
+          </p>
+          <div class="grid sm:grid-cols-3 gap-3 text-[11px]">
+            <div class="p-3 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
+              <div>
+                <span class="font-bold text-slate-100 block text-xs">1. File Upload</span>
+                <span class="text-[10px] text-cyan-400 font-mono">CSV, XLSX, JSON, Parquet</span>
+                <p class="text-slate-400 mt-1.5 leading-relaxed">Drag and drop any tabular file up to 50,000 rows / 15 MB. An automated <strong>PII Pre-Scan</strong> detects direct identifiers (emails, phone numbers, SSNs, credit cards) and lets you Mask, Drop, or Salted Hash them before synthesis begins.</p>
               </div>
-              <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">Runs <strong>Beam-Search Multi-Candidate Generation</strong> proposing 3 diverse plans per round along the Pareto frontier. Employs dependency-aware grouped sampling, copula rank preservation, and domain bound clamping.</p>
             </div>
-            <div class="p-3.5 rounded-2xl bg-slate-950/50 border border-emerald-500/20 hover:border-emerald-500/40 transition">
-              <div class="flex items-center justify-between">
-                <p class="font-bold text-emerald-400 text-xs">📏 Auditor (Utility Auditor)</p>
-                <span class="text-[9px] font-mono text-emerald-300/70 bg-emerald-500/10 px-1.5 py-0.5 rounded">Evaluator</span>
+            <div class="p-3 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
+              <div>
+                <span class="font-bold text-slate-100 block text-xs">2. Benchmark Samples</span>
+                <span class="text-[10px] text-emerald-400 font-mono">Instant 1-Click Load</span>
+                <p class="text-slate-400 mt-1.5 leading-relaxed">Instantly test with pre-loaded real-world datasets: <strong>Adult Income</strong> (demographic census & income), <strong>Diabetes Health</strong> (clinical risk predictions), or <strong>Bike Sharing</strong> (time-series forecasting).</p>
               </div>
-              <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">Computes 2-sample Kolmogorov-Smirnov distances, Total Variation, correlation divergence ($|\Delta r| \ge 0.15$ broken relationships), SQL query equivalence, and Train-on-Synthetic Test-on-Real (TSTR) ML utility.</p>
             </div>
-            <div class="p-3.5 rounded-2xl bg-slate-950/50 border border-rose-500/20 hover:border-rose-500/40 transition">
-              <div class="flex items-center justify-between">
-                <p class="font-bold text-rose-400 text-xs">🕵️ Challenger (Privacy Attacker)</p>
-                <span class="text-[9px] font-mono text-rose-300/70 bg-rose-500/10 px-1.5 py-0.5 rounded">Adversary</span>
+            <div class="p-3 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
+              <div>
+                <span class="font-bold text-slate-100 block text-xs">3. Google BigQuery</span>
+                <span class="text-[10px] text-blue-400 font-mono">Direct GCP Cloud Ingest</span>
+                <p class="text-slate-400 mt-1.5 leading-relaxed">Pull tables directly from Google Cloud BigQuery. Supports 350+ public BigQuery datasets and private enterprise tables, automatically unpacking nested Structs and Arrays into clean tabular data.</p>
+                <div class="mt-2 pt-2 border-t border-slate-800 text-[10px] space-y-1">
+                  <p class="text-slate-300 font-semibold">🔑 Required IAM Roles for Import:</p>
+                  <ul class="text-slate-400 list-disc list-inside space-y-0.5">
+                    <li><strong class="text-emerald-300">Public Datasets:</strong> Zero credentials required (uses zero-cost TableData sampling).</li>
+                    <li><strong class="text-blue-300">Private Datasets:</strong> Requires <code class="text-blue-200 font-mono">roles/bigquery.dataViewer</code> (BigQuery Data Viewer) and <code class="text-blue-200 font-mono">roles/bigquery.jobUser</code> (BigQuery Job User).</li>
+                  </ul>
+                </div>
               </div>
-              <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">Executes an <strong>Adaptive Multi-Pass Tool Loop</strong> probing nearest-neighbor re-identification, shadow Membership Inference (MIA), outlier exposure, attribute inference, auxiliary linkage, and near-duplicate rows.</p>
-            </div>
-            <div class="p-3.5 rounded-2xl bg-slate-950/50 border border-amber-500/20 hover:border-amber-500/40 transition">
-              <div class="flex items-center justify-between">
-                <p class="font-bold text-amber-400 text-xs">⚖️ Arbiter (Orchestrator)</p>
-                <span class="text-[9px] font-mono text-amber-300/70 bg-amber-500/10 px-1.5 py-0.5 rounded">Judge</span>
-              </div>
-              <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">Enforces mathematical release gates and <strong>Pareto candidate selection</strong>. Tracks multi-round state via a <code>RunBlackboard</code>, selects only gate-passing files for release, and can invoke deterministic Auto-Heal after ordinary rounds fail.</p>
             </div>
           </div>
         </div>
 
-        <!-- Mathematical Release Gates -->
-        <div class="bg-slate-950/60 p-4 sm:p-5 rounded-2xl border border-slate-800/80 space-y-3">
+        <!-- SECTION 3: FEATURE 2 - SYNTHESIS ENGINES & CONFIGURATION -->
+        <div id="guide-config" class="bg-slate-950/60 p-4 sm:p-5 rounded-2xl border border-slate-800/80 space-y-3">
+          <div class="flex items-center justify-between">
+            <h4 class="font-extrabold text-amber-300 text-sm flex items-center gap-2">
+              <span>⚙️</span> Step 2: Configure & Choose Your Synthesizer
+            </h4>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30">Engine Selection</span>
+          </div>
+          <p class="text-slate-300 text-xs leading-relaxed">
+            SynthGauntlet offers two distinct synthesis engines. Here is how to decide which one to use:
+          </p>
+          <div class="grid sm:grid-cols-2 gap-3 text-[11px]">
+            <div class="p-3.5 rounded-2xl bg-slate-900 border border-amber-500/30 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-amber-300 text-xs">⚗️ Copula / Marginal Synthesizer</span>
+                <span class="text-[9px] font-mono bg-emerald-500/15 text-emerald-300 px-1.5 py-0.5 rounded font-bold">Recommended for ML</span>
+              </div>
+              <p class="text-slate-300 leading-relaxed">
+                Uses rank-preserving Gaussian Copulas, dependency-aware grouped sampling, and conditional marginal distributions. Dynamically recombines records to break one-to-one identity linkage while preserving multi-column relationships.
+              </p>
+              <div class="pt-2 border-t border-slate-800/80 text-[10px] text-amber-200">
+                <strong>👉 When to use:</strong> When you need maximum analytical utility for Machine Learning model training, business dashboards, or software QA where preserving real-world correlations is your top priority.
+              </div>
+            </div>
+
+            <div class="p-3.5 rounded-2xl bg-slate-900 border border-sky-500/30 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-sky-300 text-xs">🔒 Differential Privacy (DP) Engine</span>
+                <span class="text-[9px] font-mono bg-sky-500/15 text-sky-300 px-1.5 py-0.5 rounded font-bold">Strict Compliance</span>
+              </div>
+              <p class="text-slate-300 leading-relaxed">
+                Splits a formal epsilon (&epsilon;) privacy budget across one-way marginals and two-way contingency tables, adding calibrated Laplace noise so the output mathematically bounds the influence of any single person.
+              </p>
+              <div class="pt-2 border-t border-slate-800/80 text-[10px] text-sky-200">
+                <strong>👉 When to use:</strong> When sharing data under strict regulatory mandates (HIPAA, GDPR) requiring a formal mathematical (&epsilon;) proof of privacy, accepting minor statistical noise in exchange for ironclad legal protection.
+              </div>
+            </div>
+          </div>
+
+          <!-- Configuration Controls Walkthrough -->
+          <div class="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-[11px] space-y-1.5">
+            <p class="font-bold text-slate-200">How to configure the remaining parameters:</p>
+            <ul class="list-disc list-inside space-y-1 text-slate-400">
+              <li><strong>Target Label:</strong> The primary prediction column (e.g. <code>income</code>, <code>churn</code>). The synthesizer ensures all relationships with this label are strictly preserved.</li>
+              <li><strong>Quasi-Identifiers (QIs):</strong> Indirect identifying columns (e.g., <code>age</code>, <code>zipcode</code>, <code>occupation</code>) that an adversary could match against public voter or phone records.</li>
+              <li><strong>Release Policy:</strong> Choose <strong>Balanced</strong> (standard default), <strong>Privacy First</strong> (tightest privacy ceilings), or <strong>Analytics First</strong> (highest utility floors).</li>
+              <li><strong>Output Rows:</strong> Specify how many synthetic rows to generate (from 500 up to 10,000 rows).</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- SECTION 4: FEATURE 3 - THE ADVERSARIAL FORGE LOOP -->
+        <div id="guide-forge" class="bg-slate-950/60 p-4 sm:p-5 rounded-2xl border border-slate-800/80 space-y-3">
           <div class="flex items-center justify-between">
             <h4 class="font-extrabold text-emerald-400 text-sm flex items-center gap-2">
-              <span>🛡️</span> Mathematical Release Gates & Verification
+              <span>⚔️</span> Step 3: Multi-Agent Cast & Operational Flow
             </h4>
-            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">Dual-Scorecard Thresholds</span>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">Multi-Agent System</span>
+          </div>
+          <p class="text-slate-300 text-xs leading-relaxed">
+            When you click <strong>Forge Synthetic Data</strong>, four coordinated AI agents evaluate your data over multiple bounded rounds:
+          </p>
+          <div class="grid sm:grid-cols-2 gap-2.5 text-[11px]">
+            <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+              <span class="font-bold text-indigo-400">1. ⚗️ Forge (Generator)</span>
+              <p class="text-slate-400 mt-0.5">Proposes 3 candidate synthetic datasets per round, exploring the best trade-offs along the Pareto frontier.</p>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+              <span class="font-bold text-rose-400">2. 🕵️ Challenger (Privacy Attacker)</span>
+              <p class="text-slate-400 mt-0.5">Executes simulated adversarial attacks (nearest-neighbor linkage, membership inference) to uncover leaks.</p>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+              <span class="font-bold text-emerald-400">3. 📏 Auditor (Utility Evaluator)</span>
+              <p class="text-slate-400 mt-0.5">Calculates Kolmogorov-Smirnov statistical distributions, correlation deltas, and Machine Learning utility (TSTR).</p>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+              <span class="font-bold text-amber-400">4. ⚖️ Arbiter (Judge & Orchestrator)</span>
+              <p class="text-slate-400 mt-0.5">Applies mathematical release gates, selects Pareto winners, and triggers Auto-Heal rescue if any gate fails.</p>
+            </div>
+          </div>
+          <!-- Live Telemetry Gauges matching Screenshot 1 -->
+          <div class="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5 text-[11px]">
+            <span class="font-bold text-slate-200 block text-xs">Live Round Telemetry Gauges (Active During Execution):</span>
+            <div class="grid sm:grid-cols-2 gap-2 pt-1 text-[10px]">
+              <div class="p-2 rounded-lg bg-slate-950 border border-emerald-500/20">
+                <span class="font-bold text-emerald-400 block">📐 Utility Benchmarks (Want High):</span>
+                <span class="text-slate-400">Real-time green gauges tracking <strong>TSTR utility ratio</strong>, <strong>Distribution fidelity</strong>, and <strong>Query equivalence</strong> as new candidate tables are scored.</span>
+              </div>
+              <div class="p-2 rounded-lg bg-slate-950 border border-rose-500/20">
+                <span class="font-bold text-rose-400 block">🛡️ Privacy Leakage (Want Low):</span>
+                <span class="text-slate-400">Real-time attack gauges tracking <strong>Re-identification</strong>, <strong>Membership leakage</strong>, <strong>Attribute inference</strong>, <strong>Auxiliary linkage</strong>, and <strong>Near duplicates</strong>.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION 4: FEATURE - DUEL ROUND-BY-ROUND TABLE & AUTO-HEAL -->
+        <div id="guide-duel-table" class="bg-slate-950/60 p-4 sm:p-5 rounded-2xl border border-slate-800/80 space-y-3">
+          <div class="flex items-center justify-between">
+            <h4 class="font-extrabold text-amber-300 text-sm flex items-center gap-2">
+              <span>📋</span> Step 4: The Duel, Round by Round & Auto-Heal Rescue
+            </h4>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30">Execution Log</span>
+          </div>
+          <p class="text-slate-300 text-xs leading-relaxed">
+            During synthesis, the live section displays <strong>"The Duel, Round by Round"</strong> table alongside the <strong>Live Activity Stream</strong>:
+          </p>
+          <div class="space-y-2 text-[11px]">
+            <div class="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5">
+              <span class="font-bold text-slate-100 block text-xs">How to Read the Duel Rounds Table:</span>
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1 text-[10px]">
+                <div class="p-2 rounded-lg bg-slate-950 border border-slate-800/80">
+                  <span class="font-bold text-slate-300 block">Round</span>
+                  <span class="text-slate-400">Iteration number (up to 5 adversarial rounds).</span>
+                </div>
+                <div class="p-2 rounded-lg bg-slate-950 border border-slate-800/80">
+                  <span class="font-bold text-emerald-400 block">Utility</span>
+                  <span class="text-slate-400">Aggregated TSTR ML utility & SQL query equivalence score.</span>
+                </div>
+                <div class="p-2 rounded-lg bg-slate-950 border border-slate-800/80">
+                  <span class="font-bold text-cyan-400 block">Fidelity</span>
+                  <span class="text-slate-400">Marginal 1D distribution match (Target &ge; 82%).</span>
+                </div>
+                <div class="p-2 rounded-lg bg-slate-950 border border-slate-800/80">
+                  <span class="font-bold text-rose-400 block">Re-ID Risk</span>
+                  <span class="text-slate-400">Nearest-neighbor breach rate (Target &le; 1.0%).</span>
+                </div>
+                <div class="p-2 rounded-lg bg-slate-950 border border-slate-800/80">
+                  <span class="font-bold text-purple-400 block">Membership</span>
+                  <span class="text-slate-400">Shadow MIA classifier AUC (Target &le; 60%).</span>
+                </div>
+                <div class="p-2 rounded-lg bg-slate-950 border border-slate-800/80">
+                  <span class="font-bold text-amber-400 block">Gate</span>
+                  <span class="text-slate-400">Green PASS badge if all criteria met, else Red FAIL.</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-slate-900/90 border border-amber-500/25 space-y-1.5">
+              <span class="font-bold text-amber-200 block text-xs">Auto-Heal Rescue Ladder:</span>
+              <p class="text-slate-400 leading-relaxed">
+                If the adversarial rounds finish without a fully certified candidate, SynthGauntlet doesn't abandon the run—it automatically activates the <strong>Auto-Heal Rescue Ladder</strong>:
+              </p>
+              <ul class="list-disc list-inside space-y-1 text-slate-400 pl-1">
+                <li><strong class="text-amber-300">Attempt 1 (Tighten):</strong> Increases recombination dials, adds slight numeric perturbation, and elevates rare category floors.</li>
+                <li><strong class="text-amber-300">Attempt 2 (Generalize):</strong> Performs targeted bucketization of Quasi-Identifiers (e.g. 5-year age bins) and suppresses low-DCR rows closest to real records.</li>
+                <li><strong class="text-amber-300">Attempt 3 (Second Generation):</strong> Re-synthesizes candidates across 4 distinct random seeds using the repaired blueprint to break local minima.</li>
+              </ul>
+              <div class="pt-1.5 text-[10px] text-amber-300/90 font-mono">
+                🛡️ All rescued tables are re-audited and attacked on the original real split to prevent overfitting before certification is granted.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION 5: FEATURE - PARETO FRONTIER CHART & TRADE-OFF SLIDER -->
+        <div id="guide-pareto" class="bg-slate-950/60 p-4 sm:p-5 rounded-2xl border border-slate-800/80 space-y-3">
+          <div class="flex items-center justify-between">
+            <h4 class="font-extrabold text-violet-300 text-sm flex items-center gap-2">
+              <span>📈</span> Step 5: Privacy–Utility Frontier Chart & Trade-Off Slider
+            </h4>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-300 border border-violet-500/30">Interactive Pareto</span>
+          </div>
+          <p class="text-slate-300 text-xs leading-relaxed">
+            The <strong>Privacy–Utility Frontier</strong> scatter plot visualizes every candidate synthesized throughout your run:
+          </p>
+          <div class="grid sm:grid-cols-2 gap-3 text-[11px]">
+            <div class="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5">
+              <span class="font-bold text-slate-100 block text-xs">Understanding the Chart:</span>
+              <ul class="space-y-1 text-slate-400 list-disc list-inside">
+                <li><strong class="text-slate-200">Vertical Axis (Y):</strong> Utility score (higher is better — preserves predictive power).</li>
+                <li><strong class="text-slate-200">Horizontal Axis (X):</strong> Privacy breach risk (lower is better — stronger anonymization).</li>
+                <li><strong class="text-emerald-400">Green Dots:</strong> Certified candidates that satisfied all utility floors and privacy ceilings.</li>
+                <li><strong class="text-rose-400">Red Dots:</strong> Uncertified candidates that breached a ceiling or fell below a floor.</li>
+                <li><strong class="text-violet-400">Purple Line:</strong> The <strong>Pareto Skyline</strong> connecting optimal candidates where utility cannot increase without adding privacy risk.</li>
+                <li><strong class="text-slate-500">Shaded Region:</strong> Forbidden zone past the privacy ceiling or below the utility floor.</li>
+              </ul>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5 flex flex-col justify-between">
+              <div>
+                <span class="font-bold text-violet-300 block text-xs">Using the Trade-Off Slider:</span>
+                <p class="text-slate-400 mt-1 leading-relaxed">
+                  Located directly below the chart, the <strong>Trade-Off Slider</strong> allows data stewards to explore certified candidates in real time between:
+                </p>
+                <div class="flex justify-between text-[10px] font-bold uppercase text-slate-400 pt-2">
+                  <span class="text-sky-400">🛡️ Max Privacy</span>
+                  <span class="text-emerald-400">⚡ Max Utility</span>
+                </div>
+              </div>
+              <div class="p-2 rounded-lg bg-violet-950/40 border border-violet-500/20 text-[10px] text-violet-200">
+                ✨ <strong>Instant Switching:</strong> Dragging the slider dynamically updates the active release table for CSV download and BigQuery export <em>without having to re-run synthesis</em>!
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION 6: FEATURE - DUAL SCORECARD & FAIRNESS -->
+        <div id="guide-scorecard" class="bg-slate-950/60 p-4 sm:p-5 rounded-2xl border border-slate-800/80 space-y-3">
+          <div class="flex items-center justify-between">
+            <h4 class="font-extrabold text-emerald-400 text-sm flex items-center gap-2">
+              <span>⚖️</span> Step 6: Dual Scorecard (Useful vs. Safe) & Fairness
+            </h4>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">Unified Evaluation</span>
+          </div>
+          <p class="text-slate-300 text-xs leading-relaxed">
+            The <strong>Dual Scorecard</strong> is SynthGauntlet's core verdict panel, presenting side-by-side mathematical utility metrics and adversarial attack outcomes:
+          </p>
+          <div class="grid md:grid-cols-2 gap-3 text-[11px]">
+            <!-- Useful Panel Explanation -->
+            <div class="p-3 rounded-xl bg-slate-900 border border-emerald-500/30 space-y-2">
+              <span class="font-bold text-emerald-400 block text-xs uppercase tracking-wide">📏 Useful Panel (Fidelity & Utility)</span>
+              <ul class="space-y-1.5 text-slate-400">
+                <li>
+                  <strong class="text-slate-200">Distribution Fidelity (&ge; 82%):</strong> Compares 1D marginal shapes using 2-sample Kolmogorov-Smirnov distances for numbers and Total Variation for categories.
+                </li>
+                <li>
+                  <strong class="text-slate-200">Utility Ratio / TSTR (&ge; 85%):</strong> <em>Train-on-Synthetic, Test-on-Real</em>. Trains an ML model on synthetic data and tests on holdout real data to ensure predictive accuracy is preserved.
+                </li>
+                <li>
+                  <strong class="text-slate-200">Query Equivalence (&ge; 95%):</strong> Evaluates analytical SQL aggregate queries (SUM, AVG, COUNT, GROUP BY) across demographic subgroups.
+                </li>
+              </ul>
+            </div>
+            <!-- Safe Panel Explanation (matching Dual Scorecard in Screenshot 4) -->
+            <div class="p-3 rounded-xl bg-slate-900 border border-rose-500/30 space-y-2">
+              <span class="font-bold text-rose-400 block text-xs uppercase tracking-wide">🛡️ Safe Panel (Privacy Attacks)</span>
+              <ul class="space-y-1 text-slate-400 text-[10px]">
+                <li>
+                  <strong class="text-slate-200">Re-Identification Risk (&le; 1.0%):</strong> Nearest-neighbor Distance to Closest Record (DCR) attack testing whether real records can be uniquely linked.
+                </li>
+                <li>
+                  <strong class="text-slate-200">Membership Leakage (&le; 60.0%):</strong> Shadow binary classifier AUC testing if an attacker can detect whether someone was in the training dataset.
+                </li>
+                <li>
+                  <strong class="text-slate-200">Outlier Linkage Exposure (&le; 10.0%):</strong> Attack on top 5% extreme multivariate outliers so rare individuals cannot be singled out.
+                </li>
+                <li>
+                  <strong class="text-slate-200">Attribute Inference Advantage (&le; 25.0%):</strong> Probes whether an attacker knowing Quasi-Identifiers can predict sensitive target attributes.
+                </li>
+                <li>
+                  <strong class="text-slate-200">Auxiliary Linkage (&le; 15.0%):</strong> Tests cross-table joinability against external auxiliary datasets.
+                </li>
+                <li>
+                  <strong class="text-slate-200">Near-Duplicate Rows (&le; 10.0%):</strong> Identifies synthetic rows that too closely mirror real records (memorization protection).
+                </li>
+              </ul>
+            </div>
+          </div>
+          <!-- Fairness & Representation Section (matching Screenshot 5) -->
+          <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-[11px] space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-slate-200 block text-xs">Fairness & Demographic Representation Breakdown:</span>
+              <span class="text-[9px] font-mono px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold">Advisory Review</span>
+            </div>
+            <p class="text-slate-400 leading-relaxed text-[10px]">
+              Directly below the Dual Scorecard, SynthGauntlet breaks down performance across demographic slices (e.g. <code class="text-slate-300 font-mono">age - 20</code>, <code class="text-slate-300 font-mono">age - 30</code>, <code class="text-slate-300 font-mono">age - 40</code>):
+            </p>
+            <div class="grid sm:grid-cols-2 gap-2 text-[10px]">
+              <div class="p-2 rounded-lg bg-slate-950 border border-slate-800">
+                <span class="font-bold text-slate-300 block">Demographic Representation (%):</span>
+                <span class="text-slate-400">Compares raw training prevalence vs synthetic prevalence (e.g., <em>Real 49.7% &rarr; Synthetic 33.7%</em>) to ensure minority cohorts are not wiped out.</span>
+              </div>
+              <div class="p-2 rounded-lg bg-slate-950 border border-slate-800">
+                <span class="font-bold text-slate-300 block">Label Gap (%):</span>
+                <span class="text-slate-400">Measures divergence in target label outcome rates per cohort. A <span class="text-amber-400 font-semibold">WARN</span> badge indicates a label shift &ge; 5%, while <span class="text-emerald-400 font-semibold">PASS</span> indicates balanced parity.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION 7: FEATURE - COLUMN DISTRIBUTION OVERLAY -->
+        <div id="guide-distributions" class="bg-slate-950/60 p-4 sm:p-5 rounded-2xl border border-slate-800/80 space-y-3">
+          <div class="flex items-center justify-between">
+            <h4 class="font-extrabold text-cyan-300 text-sm flex items-center gap-2">
+              <span>📊</span> Step 7: Column Distribution Overlay (Fidelity Inspector)
+            </h4>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">Visual Verification</span>
+          </div>
+          <p class="text-slate-300 text-xs leading-relaxed">
+            In addition to mathematical release gates, SynthGauntlet provides a <strong>Gretel-style Column Distribution Overlay</strong> directly inside the Dual Scorecard. This allows you to visually inspect how accurately each synthetic column preserves your original training data's empirical shape:
+          </p>
+          <div class="grid sm:grid-cols-2 gap-3 text-[11px]">
+            <div class="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5">
+              <div class="flex items-center gap-2 text-sky-400 font-bold">
+                <span class="w-2.5 h-2.5 rounded-full bg-sky-400"></span>
+                <span>Numeric Continuous Features</span>
+              </div>
+              <p class="text-slate-400 leading-relaxed">
+                Bins continuous data into 10 normalized histogram buckets across unified min/max bounds. Displays comparative relative frequencies (<code>% of total rows</code>) alongside Real vs. Synthetic Mean, Standard Deviation, and Spread.
+              </p>
+            </div>
+            <div class="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1.5">
+              <div class="flex items-center gap-2 text-emerald-400 font-bold">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+                <span>Categorical & String Features</span>
+              </div>
+              <p class="text-slate-400 leading-relaxed">
+                Tracks the top categorical frequencies, distinct cardinality, and modal values, grouping tail categories into an "Other" bucket. Compares categorical representation proportions side-by-side.
+              </p>
+            </div>
+          </div>
+          <div class="p-2.5 rounded-xl bg-slate-900/80 border border-cyan-500/20 text-[11px] text-slate-300 flex items-start gap-2.5">
+            <span class="text-base shrink-0">💡</span>
+            <p class="text-slate-400 leading-relaxed">
+              Use the <strong class="text-slate-200">Column dropdown</strong> in the overlay card to cycle through any column. A tight match between the <span class="text-sky-400 font-semibold">Real (Blue)</span> and <span class="text-emerald-400 font-semibold">Synthetic (Green)</span> bars confirms that marginal probability distributions and outlier shapes were accurately preserved.
+            </p>
+          </div>
+        </div>
+
+        <!-- SECTION 8: FEATURE 5 - POST-GENERATION ACTIONS -->
+        <div id="guide-outputs" class="bg-slate-950/60 p-4 sm:p-5 rounded-2xl border border-slate-800/80 space-y-3">
+          <div class="flex items-center justify-between">
+            <h4 class="font-extrabold text-purple-300 text-sm flex items-center gap-2">
+              <span>🚀</span> Step 8: Post-Run Deliverables & Actions
+            </h4>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/30">Action Buttons</span>
+          </div>
+          <p class="text-slate-300 text-xs leading-relaxed">
+            Once certification completes, the top result banner provides all certified actions in priority order:
+          </p>
+          <div class="space-y-2 text-[11px]">
+            <div class="p-2.5 rounded-xl bg-slate-900/90 border border-emerald-500/30 flex items-start gap-3">
+              <span class="text-base shrink-0">🟢</span>
+              <div>
+                <strong class="text-emerald-300">Download Synthetic CSV:</strong>
+                <p class="text-slate-400 mt-0.5">Your primary deliverable. Instantly download the certified privacy-preserved synthetic dataset ready for modeling or sharing.</p>
+              </div>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-900/90 border border-purple-500/30 flex items-start gap-3">
+              <span class="text-base shrink-0">🟣</span>
+              <div>
+                <strong class="text-purple-300">Download Certificate:</strong>
+                <p class="text-slate-400 mt-0.5">Download a branded 2-page cryptographic PDF certificate recording all gate scores, SHA-256 data hash, and HMAC signature.</p>
+              </div>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-900/90 border border-cyan-500/30 flex items-start gap-3">
+              <span class="text-base shrink-0">🔷</span>
+              <div>
+                <strong class="text-cyan-300">View Full Technical Report:</strong>
+                <p class="text-slate-400 mt-0.5">Opens a detailed scorecard modal displaying raw statistical distances, KS p-values, adversary breach rates, and a 1-click Copy button.</p>
+              </div>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-900/90 border border-amber-500/30 flex items-start gap-3">
+              <span class="text-base shrink-0">🟡</span>
+              <div>
+                <strong class="text-amber-300">Check Certificate:</strong>
+                <p class="text-slate-400 mt-0.5">Upload any previously generated CSV and Certificate PDF to cryptographically verify if the data was tampered with or altered.</p>
+              </div>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-900/90 border border-blue-500/30 flex items-start gap-3">
+              <span class="text-base shrink-0">🔵</span>
+              <div class="flex-1">
+                <strong class="text-blue-300">Export to BigQuery:</strong>
+                <p class="text-slate-400 mt-0.5">Directly upload the certified synthetic dataset into your Google Cloud BigQuery project warehouse with a single click.</p>
+                <div class="mt-1.5 p-2 rounded-lg bg-blue-950/40 border border-blue-500/20 text-[10px] text-slate-300">
+                  <span class="font-bold text-blue-200">🔑 Required IAM Roles for Export:</span>
+                  <p class="text-slate-400 mt-0.5">Your Google Account or Cloud Run Service Account must have <code class="text-blue-200 font-mono">roles/bigquery.dataEditor</code> (BigQuery Data Editor) to create datasets and write tables, plus <code class="text-blue-200 font-mono">roles/bigquery.jobUser</code> (BigQuery Job User) to execute the export job.</p>
+                </div>
+              </div>
+            </div>
+            <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-700/60 flex items-start gap-3">
+              <span class="text-base shrink-0">⚪</span>
+              <div>
+                <strong class="text-slate-200">Start New Analysis:</strong>
+                <p class="text-slate-400 mt-0.5">Clears the current session and returns you to the start to upload or select a new dataset.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION 9: TECHNICAL RELEASE GATES & METRICS APPENDIX -->
+        <div id="guide-metrics" class="bg-slate-950/60 p-4 sm:p-5 rounded-2xl border border-slate-800/80 space-y-3">
+          <div class="flex items-center justify-between">
+            <h4 class="font-extrabold text-emerald-400 text-sm flex items-center gap-2">
+              <span>📐</span> Step 9: Mathematical Release Gates & Privacy Ceilings
+            </h4>
+            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">Standards</span>
           </div>
           <p class="text-slate-400 text-[11px] leading-relaxed">
-            Data is approved only when it simultaneously passes every utility floor and privacy ceiling in the selected policy. The values below are Balanced defaults; Privacy first, Analytics first, or an interpreted custom policy changes the displayed thresholds:
+            Data is certified only when it simultaneously satisfies all utility floors and stays beneath all privacy attack ceilings:
           </p>
           <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-[10px] font-mono">
-            <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
+            <div class="p-2 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
               <div>
-                <span class="text-slate-400 block font-sans font-bold text-xs">Distribution Fidelity</span>
+                <span class="text-slate-300 block font-sans font-bold text-xs">Distribution Fidelity</span>
                 <span class="text-[9px] text-slate-500">KS-Test + Total Variation</span>
               </div>
-              <span class="text-emerald-400 font-bold text-sm mt-2">≥ 82.0%</span>
+              <span class="text-emerald-400 font-bold text-sm mt-1.5">&ge; 82.0%</span>
             </div>
-            <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
+            <div class="p-2 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
               <div>
-                <span class="text-slate-400 block font-sans font-bold text-xs">TSTR ML Utility</span>
+                <span class="text-slate-300 block font-sans font-bold text-xs">TSTR ML Utility</span>
                 <span class="text-[9px] text-slate-500">Train Synth / Test Real</span>
               </div>
-              <span class="text-emerald-400 font-bold text-sm mt-2">≥ 85.0%</span>
+              <span class="text-emerald-400 font-bold text-sm mt-1.5">&ge; 85.0%</span>
             </div>
-            <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
+            <div class="p-2 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
               <div>
-                <span class="text-slate-400 block font-sans font-bold text-xs">Query Equivalence</span>
+                <span class="text-slate-300 block font-sans font-bold text-xs">Query Equivalence</span>
                 <span class="text-[9px] text-slate-500">Stratified Aggregate Match</span>
               </div>
-              <span class="text-emerald-400 font-bold text-sm mt-2">≥ 95.0%</span>
+              <span class="text-emerald-400 font-bold text-sm mt-1.5">&ge; 95.0%</span>
             </div>
-            <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
+            <div class="p-2 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
               <div>
-                <span class="text-slate-400 block font-sans font-bold text-xs">Re-ID Risk (Linkage)</span>
+                <span class="text-slate-300 block font-sans font-bold text-xs">Re-ID Risk (Linkage)</span>
                 <span class="text-[9px] text-slate-500">Nearest-Neighbor Match</span>
               </div>
-              <span class="text-emerald-400 font-bold text-sm mt-2">≤ 1.0%</span>
+              <span class="text-emerald-400 font-bold text-sm mt-1.5">&le; 1.0%</span>
             </div>
-            <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
+            <div class="p-2 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
               <div>
-                <span class="text-slate-400 block font-sans font-bold text-xs">Membership Leakage</span>
+                <span class="text-slate-300 block font-sans font-bold text-xs">Membership Leakage</span>
                 <span class="text-[9px] text-slate-500">Shadow DCR Classifier</span>
               </div>
-              <span class="text-emerald-400 font-bold text-sm mt-2">≤ 60.0%</span>
+              <span class="text-emerald-400 font-bold text-sm mt-1.5">&le; 60.0%</span>
             </div>
-            <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
+            <div class="p-2 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
               <div>
-                <span class="text-slate-400 block font-sans font-bold text-xs">Outlier Linkage</span>
-                <span class="text-[9px] text-slate-500">Cluster Corner Attacks</span>
-              </div>
-              <span class="text-emerald-400 font-bold text-sm mt-2">≤ 10.0%</span>
-            </div>
-            <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
-              <div>
-                <span class="text-slate-400 block font-sans font-bold text-xs">Attribute Inference</span>
+                <span class="text-slate-300 block font-sans font-bold text-xs">Attribute Inference</span>
                 <span class="text-[9px] text-slate-500">Sensitive-value Advantage</span>
               </div>
-              <span class="text-emerald-400 font-bold text-sm mt-2">≤ 25.0%</span>
-            </div>
-            <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
-              <div>
-                <span class="text-slate-400 block font-sans font-bold text-xs">Auxiliary Linkage</span>
-                <span class="text-[9px] text-slate-500">External Key Matching</span>
-              </div>
-              <span class="text-emerald-400 font-bold text-sm mt-2">≤ 15.0%</span>
-            </div>
-            <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex flex-col justify-between">
-              <div>
-                <span class="text-slate-400 block font-sans font-bold text-xs">Near-Duplicate Rows</span>
-                <span class="text-[9px] text-slate-500">Whole-Row Similarity</span>
-              </div>
-              <span class="text-emerald-400 font-bold text-sm mt-2">≤ 10.0%</span>
+              <span class="text-emerald-400 font-bold text-sm mt-1.5">&le; 25.0%</span>
             </div>
           </div>
-        </div>
-
-        <!-- Deterministic Knobs & Convergence Dial -->
-        <div class="bg-slate-950/60 p-4 sm:p-5 rounded-2xl border border-slate-800/80 space-y-3">
-          <h4 class="font-extrabold text-amber-300 text-sm flex items-center gap-2">
-            <span>🎛️</span> Deterministic Synthesis Engine & Knobs
-          </h4>
-          <p class="text-slate-400 text-[11px] leading-relaxed">
-            The multi-agent loop dynamically tunes synthesis parameters between rounds to eliminate privacy vulnerabilities while recovering domain utility:
-          </p>
-          <div class="grid sm:grid-cols-2 gap-2.5 text-[11px]">
-            <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
-              <span class="font-bold text-amber-300">🔀 Recombination Dial (0.0 → 1.0):</span>
-              <p class="text-slate-400 mt-1 leading-relaxed">The primary privacy dial. At <strong class="text-slate-200">0.0</strong>, records mirror real source records. At <strong class="text-slate-200">1.0</strong>, attributes are recombined across independent records using conditional marginals, neutralizing re-identification.</p>
-            </div>
-            <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
-              <span class="font-bold text-indigo-300">📈 Rank-Preserving Copula Jitter:</span>
-              <p class="text-slate-400 mt-1 leading-relaxed">Scaled noise jitter applied according to column covariance and standard deviation, protecting outliers while maintaining correlation ranks.</p>
-            </div>
-            <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
-              <span class="font-bold text-indigo-300">🎲 Categorical Resampling & Rare Floor:</span>
-              <p class="text-slate-400 mt-1 leading-relaxed">Resamples categorical values from conditional marginals and clamps rare categories (<1% frequency) to prevent unique fingerprinting.</p>
-            </div>
-            <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
-              <span class="font-bold text-emerald-300">🔒 Deterministic Fallback:</span>
-              <p class="text-slate-400 mt-1 leading-relaxed">If Gemini is unavailable or times out, the deterministic planner continues the bounded round sequence. Certification still requires every configured release gate to pass.</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Multi-format ingestion and PII -->
-        <div class="bg-slate-950/60 p-4 sm:p-5 rounded-2xl border border-slate-800/80 space-y-3">
-          <div class="flex items-center justify-between gap-3">
-            <h4 class="font-extrabold text-cyan-300 text-sm flex items-center gap-2">
-              <span>📂</span> Multi-Format Upload & PII Pre-Gate
-            </h4>
-            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">Before Profiling</span>
-          </div>
-          <div class="grid sm:grid-cols-2 gap-2.5 text-[11px]">
-            <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
-              <p class="font-bold text-cyan-300">Supported files</p>
-              <p class="text-slate-400 mt-1 leading-relaxed"><strong class="text-slate-200">CSV / TSV</strong> with delimiter detection, <strong class="text-slate-200">XLSX</strong> with sheet selection, <strong class="text-slate-200">JSON / JSONL</strong> with nested-key flattening, and <strong class="text-slate-200">Parquet</strong>. Nested lists become comma-separated text with a warning. Legacy XLS files should be saved as XLSX.</p>
-            </div>
-            <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
-              <p class="font-bold text-amber-300">Deterministic PII detection</p>
-              <p class="text-slate-400 mt-1 leading-relaxed">Scans for email, phone, SSN, IP address, URL, Luhn-valid payment-card patterns, sensitive column names, and highly unique ID-like columns. Examples shown in the modal are redacted.</p>
-            </div>
-            <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800 sm:col-span-2">
-              <p class="font-bold text-emerald-300">Available remediation</p>
-              <p class="text-slate-400 mt-1 leading-relaxed"><strong class="text-slate-200">Mask</strong> replaces values with a redaction marker; <strong class="text-slate-200">Drop</strong> removes the column; <strong class="text-slate-200">Salted Hash</strong> creates stable one-way tokens; and <strong class="text-slate-200">Synthetic Replacement</strong> uses seeded Faker values independent of the originals. Remediation happens locally before semantic profiling or synthesis.</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- DP, Auto-Heal, Pareto, policy, fairness -->
-        <div class="space-y-3">
-          <h4 class="font-extrabold text-slate-100 text-sm flex items-center gap-2">
-            <span>🧭</span> Synthesis, Rescue & Decision Support
-          </h4>
-          <div class="grid sm:grid-cols-2 gap-3">
-            <div class="p-3.5 rounded-2xl bg-slate-950/50 border border-sky-500/20">
-              <p class="font-bold text-sky-300 text-xs">Differential Privacy Engine</p>
-              <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">Choose <strong>Laplace DP</strong> to split an epsilon budget across one-way marginals and two-way tables that tie the label to its strongest columns. Numeric values are drawn inside each noisy bin, and later rounds redraw from that same release. Smaller epsilon adds more noise. The scorecard states a formal epsilon guarantee only when the released table remains on the pure DP path; a hybrid or Auto-Heal replacement displays <em>No formal DP guarantee</em>.</p>
-            </div>
-            <div class="p-3.5 rounded-2xl bg-slate-950/50 border border-emerald-500/20">
-              <p class="font-bold text-emerald-300 text-xs">Auto-Heal Rescue</p>
-              <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">If all ordinary rounds miss the gate, Auto-Heal searches deterministic privacy-safe redraws, removes rows closest to training records, suppresses singleton quasi-identifier combinations, and can apply generalization or second-generation synthesis. Every candidate is rechecked by the Auditor, Challenger, and Arbiter. A repaired file becomes downloadable only after it passes every gate and is labeled <strong>CERTIFIED_AFTER_RESCUE</strong>.</p>
-            </div>
-            <div class="p-3.5 rounded-2xl bg-slate-950/50 border border-violet-500/20">
-              <p class="font-bold text-violet-300 text-xs">Pareto Privacy–Utility Frontier</p>
-              <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">Every candidate from the current run is plotted by utility score and normalized privacy risk. The connecting line marks non-dominated candidates. Drag the slider or select a point to inspect it; download remains attached to a candidate that passed the release gate.</p>
-            </div>
-            <div class="p-3.5 rounded-2xl bg-slate-950/50 border border-indigo-500/20">
-              <p class="font-bold text-indigo-300 text-xs">Release Policy Controls</p>
-              <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">Use <strong>Privacy first</strong>, <strong>Balanced</strong>, or <strong>Analytics first</strong>, or describe a custom priority. Only policy text is sent for interpretation—never source rows. The resulting numeric thresholds are displayed, validated, and enforced by deterministic code.</p>
-            </div>
-            <div class="p-3.5 rounded-2xl bg-slate-950/50 border border-amber-500/20 sm:col-span-2">
-              <p class="font-bold text-amber-300 text-xs">Fairness & Representation Advisory</p>
-              <p class="text-[11px] text-slate-400 mt-1 leading-relaxed">The scorecard compares representation and outcome behavior for detected groups and reports warnings when disparities merit review. Fairness is an advisory signal: it does not override the deterministic privacy-and-utility release gate and does not independently block download.</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Signed certificate -->
-        <div class="bg-slate-950/60 p-4 sm:p-5 rounded-2xl border border-slate-800/80 space-y-3">
-          <div class="flex items-center justify-between gap-3">
-            <h4 class="font-extrabold text-indigo-300 text-sm flex items-center gap-2">
-              <span>📜</span> Signed Certificate & Tamper Verification
-            </h4>
-            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/30">Certified Runs Only</span>
-          </div>
-          <div class="grid sm:grid-cols-3 gap-2.5 text-[11px]">
-            <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
-              <p class="font-bold text-slate-200">1. Evidence record</p>
-              <p class="text-slate-400 mt-1 leading-relaxed">The branded two-page PDF records the run, policy, DP statement, row counts, every gate result, synthesis and attack method, SHA-256 fingerprints, and issue time.</p>
-            </div>
-            <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
-              <p class="font-bold text-slate-200">2. Digital sealing</p>
-              <p class="text-slate-400 mt-1 leading-relaxed">The synthetic CSV is fingerprinted with SHA-256. The canonical certificate record is signed with HMAC-SHA256 and embedded inside the PDF alongside a verification QR code.</p>
-            </div>
-            <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
-              <p class="font-bold text-slate-200">3. Check certificate</p>
-              <p class="text-slate-400 mt-1 leading-relaxed">Upload the downloaded CSV and certificate PDF. <strong class="text-emerald-300">VALID</strong> means both signature and fingerprint match; <strong class="text-rose-300">TAMPERED</strong> means a certificate field or CSV byte changed.</p>
-            </div>
-          </div>
-          <p class="text-[10px] leading-relaxed text-slate-500">The certificate supplies technical evidence for the tested file. It does not constitute legal HIPAA, GDPR, or regulatory certification. Re-saving a CSV can change its byte-level fingerprint even when displayed values appear unchanged.</p>
-        </div>
-
-        <!-- SDK and MCP -->
-        <div class="bg-slate-950/60 p-4 sm:p-5 rounded-2xl border border-slate-800/80 space-y-3">
-          <div class="flex items-center justify-between gap-3">
-            <h4 class="font-extrabold text-purple-300 text-sm flex items-center gap-2">
-              <span>🧩</span> Python SDK & MCP Tools
-            </h4>
-            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/30">Automation</span>
-          </div>
-          <div class="grid sm:grid-cols-2 gap-2.5 text-[11px]">
-            <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
-              <p class="font-bold text-purple-300">Python client</p>
-              <p class="text-slate-400 mt-1 leading-relaxed"><code class="text-purple-200">SynthGauntletClient</code> provides upload, synchronous forge, scorecard retrieval, certified download, and certificate verification against the existing API.</p>
-            </div>
-            <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
-              <p class="font-bold text-purple-300">FastMCP server</p>
-              <p class="text-slate-400 mt-1 leading-relaxed">Tools include <code class="text-purple-200">synthgauntlet_start_synthesis</code>, <code class="text-purple-200">synthgauntlet_get_scorecard</code>, and <code class="text-purple-200">synthgauntlet_verify_certificate</code>. Tool responses expose status and metric summaries, never raw rows.</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- BigQuery Integration & Schema Normalization -->
-        <div class="bg-slate-950/60 p-4 sm:p-5 rounded-2xl border border-slate-800/80 space-y-3">
-          <div class="flex items-center justify-between">
-            <h4 class="font-extrabold text-blue-400 text-sm flex items-center gap-2">
-              <span>🔷</span> Google BigQuery Guide & Nested Types
-            </h4>
-            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/30">TableData & Export API</span>
-          </div>
-          <div class="space-y-2">
-            <p class="font-bold text-slate-200 text-xs flex items-center gap-1.5">
-              <span>📥</span> 1. Ingesting Tables from BigQuery:
-            </p>
-            <ul class="list-disc list-inside space-y-1 text-slate-400 pl-1">
-              <li>Supports all <strong>350+ Google BigQuery Public Datasets</strong> (e.g. <code class="text-blue-300 font-mono">bigquery-public-data</code>) with zero-cost table sampling via the TableData API.</li>
-              <li>Supports private datasets by signing in with your Google account or granting the host Service Account the <code class="text-blue-300 font-mono">BigQuery Data Viewer</code> role.</li>
-              <li><strong>Deep Nested Type Normalization</strong>: Automatically detects and serializes complex BigQuery <code class="text-blue-300 font-mono">ARRAY</code>, <code class="text-blue-300 font-mono">STRUCT</code>, <code class="text-blue-300 font-mono">REPEATED</code> records, <code class="text-blue-300 font-mono">GEOGRAPHY</code>, and <code class="text-blue-300 font-mono">BYTES</code> into clean, hashable JSON strings.</li>
-            </ul>
-          </div>
-          <div class="space-y-2 pt-2 border-t border-slate-800/80">
-            <p class="font-bold text-slate-200 text-xs flex items-center gap-1.5">
-              <span>🚀</span> 2. Exporting Synthetic Data to BigQuery:
-            </p>
-            <ul class="list-disc list-inside space-y-1 text-slate-400 pl-1">
-              <li>Click <strong>Export to BigQuery</strong> directly on the scorecard or from any session in <strong>History</strong>.</li>
-              <li>Automatically creates destination datasets if missing and writes tables using <code class="text-blue-300 font-mono">WRITE_TRUNCATE</code>.</li>
-              <li>Requires <code class="text-blue-300 font-mono">BigQuery Data Editor</code> and <code class="text-blue-300 font-mono">BigQuery Job User</code> roles on the target project.</li>
-            </ul>
-          </div>
-        </div>
-
-        <!-- System Limits & Operational Boundaries -->
-        <div class="bg-slate-950/60 p-4 sm:p-5 rounded-2xl border border-slate-800/80 space-y-3">
-          <h4 class="font-extrabold text-slate-200 text-sm flex items-center gap-2">
-            <span>⚙️</span> System Boundaries & Ingestion Limits
-          </h4>
-          <div class="grid sm:grid-cols-2 gap-2.5 text-[11px]">
-            <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
-              <span class="font-bold text-slate-200">📂 Source Data Ingestion (Input):</span>
-              <p class="text-slate-400 mt-0.5">Supports CSV, TSV, XLSX, JSON, JSONL, and Parquet uploads up to <strong class="text-slate-200">50,000 rows / 15 MB</strong> and BigQuery sample imports up to <strong class="text-slate-200">10,000 rows</strong>.</p>
-            </div>
-            <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
-              <span class="font-bold text-indigo-300">✨ Rows to Forge (Output):</span>
-              <p class="text-slate-400 mt-0.5">Strictly enforced: <strong class="text-indigo-300">Min 500 rows</strong> · <strong class="text-indigo-300">Max 10,000 rows</strong> (< 500 synthetic rows degrades ML utility & statistical auditing power).</p>
-            </div>
-            <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
-              <span class="font-bold text-amber-300">🔄 Adversarial Pass Cap:</span>
-              <p class="text-slate-400 mt-0.5">Up to <strong class="text-amber-300">5 configured rounds</strong> with multi-candidate Pareto beam search, followed by optional Auto-Heal rescue attempts. A run may finish uncertified.</p>
-            </div>
-            <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
-              <span class="font-bold text-emerald-300">🔒 Privacy Defense:</span>
-              <p class="text-slate-400 mt-0.5">Automated re-identification, membership, outlier, attribute-inference, auxiliary-linkage, and near-duplicate defenses. Failed certification hides CSV, BigQuery, and certificate hand-off.</p>
-            </div>
+          <div class="p-2.5 rounded-xl bg-indigo-950/20 border border-indigo-500/20 text-[10px] text-slate-400">
+            🔒 <strong>Strict Zero Raw Row Transmission:</strong> Raw records are never transmitted to any external LLM prompt. Only anonymized statistical summaries, covariance matrices, and column schemas cross the boundary.
           </div>
         </div>
 
@@ -2367,6 +2651,154 @@ function renderScorecard(resp) {
   if(el('runPolicyDescription')) el('runPolicyDescription').textContent = resp.policy_explanation || 'The run used the displayed deterministic release thresholds.';
   el('scorecardSection').classList.remove('hidden');
   renderPareto(resp);
+  renderDistributions(resp);
+}
+
+let currentDistData = null;
+
+function renderDistributions(resp) {
+  const section = el('distributionSection');
+  if (!section) return;
+  const dist = resp && resp.column_distributions;
+  if (!dist || !dist.columns || dist.columns.length === 0) {
+    section.classList.add('hidden');
+    currentDistData = null;
+    return;
+  }
+  currentDistData = dist;
+  section.classList.remove('hidden');
+
+  const select = el('distColSelect');
+  if (select) {
+    const prevVal = select.value;
+    select.innerHTML = dist.columns.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+    if (prevVal && dist.columns.includes(prevVal)) {
+      select.value = prevVal;
+    } else {
+      select.value = dist.columns[0];
+    }
+  }
+  updateDistChart();
+}
+
+function onDistColChange() {
+  updateDistChart();
+}
+
+function updateDistChart() {
+  if (!currentDistData) return;
+  const select = el('distColSelect');
+  const colName = select ? select.value : currentDistData.columns[0];
+  const info = currentDistData.details && currentDistData.details[colName];
+  if (!info) return;
+
+  const statsBar = el('distStatsBar');
+  const container = el('distChartContainer');
+
+  if (statsBar) {
+    if (info.type === 'numeric') {
+      const rMean = info.real_stats?.mean !== undefined ? info.real_stats.mean : '—';
+      const sMean = info.synth_stats?.mean !== undefined ? info.synth_stats.mean : '—';
+      const rStd = info.real_stats?.std !== undefined ? info.real_stats.std : '—';
+      const sStd = info.synth_stats?.std !== undefined ? info.synth_stats.std : '—';
+      const rMin = info.real_stats?.min !== undefined ? info.real_stats.min : '—';
+      const rMax = info.real_stats?.max !== undefined ? info.real_stats.max : '—';
+      statsBar.innerHTML = `
+        <div class="p-3 rounded-2xl bg-slate-950/70 border border-slate-800">
+          <div class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Mean (Real vs Synth)</div>
+          <div class="mt-1 flex items-baseline gap-2">
+            <span class="text-sm font-bold text-sky-400 font-mono">${rMean}</span>
+            <span class="text-slate-600">/</span>
+            <span class="text-sm font-bold text-emerald-400 font-mono">${sMean}</span>
+          </div>
+        </div>
+        <div class="p-3 rounded-2xl bg-slate-950/70 border border-slate-800">
+          <div class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Std Dev (Spread)</div>
+          <div class="mt-1 flex items-baseline gap-2">
+            <span class="text-sm font-bold text-sky-400 font-mono">${rStd}</span>
+            <span class="text-slate-600">/</span>
+            <span class="text-sm font-bold text-emerald-400 font-mono">${sStd}</span>
+          </div>
+        </div>
+        <div class="p-3 rounded-2xl bg-slate-950/70 border border-slate-800">
+          <div class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Range [Min, Max]</div>
+          <div class="mt-1 text-sm font-bold text-slate-300 font-mono">[${rMin}, ${rMax}]</div>
+        </div>
+        <div class="p-3 rounded-2xl bg-slate-950/70 border border-slate-800">
+          <div class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Column Type</div>
+          <div class="mt-1 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+            <span class="text-xs font-bold text-slate-200 uppercase">Numeric Continuous</span>
+          </div>
+        </div>
+      `;
+    } else {
+      const topCat = info.real_stats?.top !== undefined ? info.real_stats.top : '—';
+      const numUnique = info.real_stats?.unique !== undefined ? info.real_stats.unique : '—';
+      statsBar.innerHTML = `
+        <div class="p-3 rounded-2xl bg-slate-950/70 border border-slate-800">
+          <div class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Top Category (Real)</div>
+          <div class="mt-1 text-sm font-bold text-sky-400 font-mono truncate">${escapeHtml(String(topCat))}</div>
+        </div>
+        <div class="p-3 rounded-2xl bg-slate-950/70 border border-slate-800">
+          <div class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Distinct Values</div>
+          <div class="mt-1 text-sm font-bold text-slate-300 font-mono">${numUnique} categories</div>
+        </div>
+        <div class="p-3 rounded-2xl bg-slate-950/70 border border-slate-800">
+          <div class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Sampled Bins</div>
+          <div class="mt-1 text-sm font-bold text-emerald-400 font-mono">${info.labels.length} tracked</div>
+        </div>
+        <div class="p-3 rounded-2xl bg-slate-950/70 border border-slate-800">
+          <div class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Column Type</div>
+          <div class="mt-1 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+            <span class="text-xs font-bold text-slate-200 uppercase">Categorical / String</span>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  if (container) {
+    const maxPct = Math.max(
+      ...(info.real_pct || []),
+      ...(info.synth_pct || []),
+      1
+    );
+
+    let html = '';
+    for (let i = 0; i < info.labels.length; i++) {
+      const lbl = info.labels[i];
+      const rPct = (info.real_pct && info.real_pct[i] !== undefined) ? info.real_pct[i] : 0.0;
+      const sPct = (info.synth_pct && info.synth_pct[i] !== undefined) ? info.synth_pct[i] : 0.0;
+      const diff = Math.abs(rPct - sPct).toFixed(1);
+
+      const rWidth = rPct > 0 ? Math.max(1.5, (rPct / maxPct) * 100).toFixed(1) : '0';
+      const sWidth = sPct > 0 ? Math.max(1.5, (sPct / maxPct) * 100).toFixed(1) : '0';
+
+      html += `
+        <div class="p-2.5 rounded-xl bg-slate-950/50 border border-slate-800/80 hover:border-slate-700/80 transition-colors">
+          <div class="flex items-center justify-between text-xs font-mono mb-1.5">
+            <span class="text-slate-300 font-semibold truncate max-w-[240px]" title="${escapeHtml(String(lbl))}">${escapeHtml(String(lbl))}</span>
+            <div class="flex items-center gap-3 sm:gap-4 text-[11px]">
+              <span class="text-sky-400 font-bold"><span class="text-slate-500 font-normal mr-1">Real</span>${rPct}%</span>
+              <span class="text-emerald-400 font-bold"><span class="text-slate-500 font-normal mr-1">Synth</span>${sPct}%</span>
+              <span class="text-slate-400 text-[10px] font-mono"><span class="text-slate-500">Δ</span>${diff}%</span>
+            </div>
+          </div>
+          <div class="space-y-1">
+            <div class="h-2 w-full bg-slate-800/60 rounded-full overflow-hidden" title="Real: ${rPct}%">
+              <div class="h-full bg-gradient-to-r from-sky-500 to-cyan-400 rounded-full transition-all duration-300" style="width: ${rWidth}%"></div>
+            </div>
+            <div class="h-2 w-full bg-slate-800/60 rounded-full overflow-hidden" title="Synthetic: ${sPct}%">
+              <div class="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-300" style="width: ${sWidth}%"></div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+    container.innerHTML = html;
+  }
 }
 
 function fillMetricCards(u, a, t) {
@@ -3874,6 +4306,32 @@ async function applyPii(){
   finishUpload(file, info);
 }
 
+function openTechnicalReportModal(){
+  const m = el('technicalReportModal');
+  if (m) m.classList.remove('hidden');
+}
+
+function closeTechnicalReportModal(){
+  const m = el('technicalReportModal');
+  if (m) m.classList.add('hidden');
+}
+
+async function copyScorecardText(){
+  const text = el('scorecardText')?.textContent || '';
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    const lbl = el('copyScorecardLabel');
+    if (lbl) {
+      const orig = lbl.textContent;
+      lbl.textContent = 'Copied!';
+      setTimeout(() => { lbl.textContent = orig; }, 2000);
+    }
+  } catch(e) {
+    console.error('Clipboard copy failed', e);
+  }
+}
+
 function openVerifyModal(){
   el('verifyResult').classList.add('hidden');
   el('verifyModal').classList.remove('hidden');
@@ -4316,7 +4774,7 @@ function finish(resp){
   if(resp && resp.status === 'ABORTED'){
     logLine(null, '🛑 Execution aborted. Zero synthetic data generated.');
     updateActiveHistoryStatus('ABORTED');
-    ['castSection','metricsSection','liveSection','scorecardSection','difficultyBanner','rescueSection'].forEach(id=>el(id).classList.add('hidden'));
+    ['castSection','metricsSection','liveSection','scorecardSection','difficultyBanner','rescueSection','distributionSection'].forEach(id=>el(id).classList.add('hidden'));
     return;
   }
 
@@ -4357,8 +4815,9 @@ function finish(resp){
 function startNewAnalysis(){
   destroyParetoChart();
   paretoView = null;
+  currentDistData = null;
   // Hide all result sections
-  ['castSection','metricsSection','liveSection','scorecardSection','difficultyBanner','rescueSection'].forEach(id => {
+  ['castSection','metricsSection','liveSection','scorecardSection','difficultyBanner','rescueSection','distributionSection'].forEach(id => {
     const s = el(id); if(s){ s.classList.add('hidden'); }
   });
   // Clear round table + log

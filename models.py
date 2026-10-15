@@ -323,6 +323,7 @@ class ForgeResponse(BaseModel):
     policy_source: str = "preset"
     policy_explanation: str = ""
     ai_usage: List[AIUsageStep] = Field(default_factory=list)
+    column_distributions: Optional[Dict[str, Any]] = None
 
 
 class RunStartResponse(BaseModel):

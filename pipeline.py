@@ -16,7 +16,7 @@ import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
-from typing import Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -153,6 +153,96 @@ def activate_passing_candidate(run_id: str, candidate_id: str) -> Optional[pd.Da
     _RUN_CACHE[run_id] = frame
     reporter.export_csv(frame, run_id)
     return frame
+
+
+def compute_column_distributions(
+    real_df: pd.DataFrame,
+    synth_df: pd.DataFrame,
+    max_cols: int = 12,
+) -> Optional[Dict[str, Any]]:
+    """Compute normalized histogram and categorical distributions for Real vs Synthetic comparison."""
+    if real_df is None or synth_df is None or real_df.empty or synth_df.empty:
+        return None
+    try:
+        res: Dict[str, Any] = {"columns": [], "details": {}}
+        common_cols = [c for c in real_df.columns if c in synth_df.columns]
+        for col in common_cols[:max_cols]:
+            try:
+                r_s = real_df[col].dropna()
+                s_s = synth_df[col].dropna()
+                if len(r_s) == 0 or len(s_s) == 0:
+                    continue
+                is_num = pd.api.types.is_numeric_dtype(r_s) and r_s.nunique() > 10
+                if is_num:
+                    c_min = float(min(r_s.min(), s_s.min()))
+                    c_max = float(max(r_s.max(), s_s.max()))
+                    if c_min == c_max:
+                        c_max += 1.0
+                    bins = np.linspace(c_min, c_max, 11)
+                    r_counts, _ = np.histogram(r_s, bins=bins)
+                    s_counts, _ = np.histogram(s_s, bins=bins)
+                    r_total = max(1, len(r_s))
+                    s_total = max(1, len(s_s))
+                    labels = [
+                        f"{bins[i]:.1f}-{bins[i+1]:.1f}"
+                        if (c_max - c_min < 100)
+                        else f"{int(bins[i])}-{int(bins[i+1])}"
+                        for i in range(10)
+                    ]
+                    r_pct = [round(float(c) / r_total * 100, 1) for c in r_counts]
+                    s_pct = [round(float(c) / s_total * 100, 1) for c in s_counts]
+                    res["columns"].append(col)
+                    res["details"][col] = {
+                        "type": "numeric",
+                        "labels": labels,
+                        "real_pct": r_pct,
+                        "synth_pct": s_pct,
+                        "real_stats": {
+                            "mean": round(float(r_s.mean()), 2),
+                            "std": round(float(r_s.std()), 2),
+                            "min": round(c_min, 2),
+                            "max": round(c_max, 2),
+                        },
+                        "synth_stats": {
+                            "mean": round(float(s_s.mean()), 2),
+                            "std": round(float(s_s.std()), 2),
+                            "min": round(float(s_s.min()), 2),
+                            "max": round(float(s_s.max()), 2),
+                        },
+                    }
+                else:
+                    top_cats = r_s.astype(str).value_counts().head(7).index.tolist()
+                    r_str = r_s.astype(str).apply(lambda x: x if x in top_cats else "Other")
+                    s_str = s_s.astype(str).apply(lambda x: x if x in top_cats else "Other")
+                    categories = list(top_cats)
+                    if (r_str == "Other").any() or (s_str == "Other").any():
+                        if "Other" not in categories:
+                            categories.append("Other")
+                    r_vc = r_str.value_counts(normalize=True) * 100
+                    s_vc = s_str.value_counts(normalize=True) * 100
+                    r_pct = [round(float(r_vc.get(c, 0.0)), 1) for c in categories]
+                    s_pct = [round(float(s_vc.get(c, 0.0)), 1) for c in categories]
+                    res["columns"].append(col)
+                    res["details"][col] = {
+                        "type": "categorical",
+                        "labels": [str(c)[:18] for c in categories],
+                        "real_pct": r_pct,
+                        "synth_pct": s_pct,
+                        "real_stats": {
+                            "top": str(r_s.mode().iloc[0]) if not r_s.empty else "N/A",
+                            "unique": int(r_s.nunique()),
+                        },
+                        "synth_stats": {
+                            "top": str(s_s.mode().iloc[0]) if not s_s.empty else "N/A",
+                            "unique": int(s_s.nunique()),
+                        },
+                    }
+            except Exception:
+                continue
+        return res if res["columns"] else None
+    except Exception as exc:
+        logger.warning("compute_column_distributions failed gracefully: %s", exc)
+        return None
 
 
 def _resolve_columns(req: ForgeRequest, meta) -> Dict[str, list]:
@@ -897,6 +987,12 @@ def run_forge(
             f"{certified_count} passed the release gate."
         )
     dual_scorecard = reporter.build_dual_scorecard(rounds, status, thresholds)
+    col_dist = None
+    if synth is not None and real_train is not None and not _is_aborted(run_id):
+        try:
+            col_dist = compute_column_distributions(real_train, synth)
+        except Exception as exc:
+            logger.warning("Could not compute column distributions for run %s: %s", run_id, exc)
 
     response = ForgeResponse(
         run_id=run_id,
@@ -920,6 +1016,7 @@ def run_forge(
         policy_name=req.policy_name,
         policy_source=req.policy_source,
         policy_explanation=req.policy_explanation,
+        column_distributions=col_dist,
     )
     if passed and synth is not None:
         try:
