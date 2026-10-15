@@ -26,12 +26,6 @@ _SYSTEM = (
     "and choose attack parameters. Respond with a single JSON object only."
 )
 
-_NARRATOR = (
-    "You are Challenger, an ethical privacy attacker writing a short, candid field "
-    "report in plain prose. Do NOT use JSON or markdown. 2-3 sentences, first person."
-)
-
-
 def _plan_initial_attack(
     profile: DatasetProfile,
     quasi_identifiers: List[str],
@@ -86,6 +80,20 @@ def _plan_initial_attack(
     }
 
 
+def plan_attack(
+    profile: DatasetProfile,
+    quasi_identifiers: List[str],
+    prior: Optional[Dict] = None,
+) -> Dict[str, Any]:
+    """Plan one shared Challenger strategy for a round's candidate beam."""
+    return _plan_initial_attack(
+        profile,
+        quasi_identifiers,
+        prior,
+        get_settings().reid_threshold,
+    )
+
+
 def _plan_followup_attack(
     intermediate_results: Dict[str, Any],
     quasi_identifiers: List[str],
@@ -123,32 +131,13 @@ def _interpret(
     worst_outlier: float,
     passes_count: int,
 ) -> str:
-    settings = get_settings()
-    facts = (
-        f"hypothesis: {initial_plan.get('hypothesis')}\n"
-        f"attack_passes: {passes_count}\n"
-        f"worst_re_id_rate: {worst_reid}\n"
-        f"worst_membership_accuracy: {worst_membership}\n"
-        f"worst_outlier_linkage: {worst_outlier}"
-    )
-    text = llm.generate_text(
-        "Given your attack results, write 2-3 sentences (first person, as Challenger) "
-        "explaining what you tried across your attack passes, what leaked, and what you'll target next.\n\n"
-        f"{facts}",
-        model=settings.attacker_model,
-        system_instruction=_NARRATOR,
-        temperature=0.8,
-        role="attacker",
-        purpose="Write the attack narrative from the measured privacy scores.",
-    )
-    if text:
-        return text
-
     verdict = "found near-copies" if worst_reid > 0.01 else "found few near-copies"
+    hypothesis = str(initial_plan.get("hypothesis") or "").strip()
+    lead = f"{hypothesis} " if hypothesis else ""
     return (
-        f"I probed across {passes_count} attack passes and {verdict} "
+        f"{lead}I probed across {passes_count} attack passes and {verdict} "
         f"(worst re-id {worst_reid}). Peak membership signal was "
-        f"{worst_membership}. I will continue targeting the rarest combinations."
+        f"{worst_membership}; outlier linkage peaked at {worst_outlier}."
     )
 
 
@@ -159,10 +148,13 @@ def attack(
     synth: pd.DataFrame,
     quasi_identifiers: List[str],
     prior: Optional[Dict] = None,
+    initial_plan: Optional[Dict[str, Any]] = None,
 ) -> AttackResult:
     """Adaptive bounded attack tool loop returning worst-case privacy risk."""
     settings = get_settings()
-    initial_plan = _plan_initial_attack(profile, quasi_identifiers, prior, settings.reid_threshold)
+    initial_plan = initial_plan or _plan_initial_attack(
+        profile, quasi_identifiers, prior, settings.reid_threshold
+    )
 
     tools_used: List[str] = ["run_reidentification", "run_membership_inference"]
     attacked_columns: List[str] = list(initial_plan["focus_columns"])

@@ -2650,8 +2650,16 @@ function renderScorecard(resp) {
   if(el('runPolicySource')) el('runPolicySource').textContent = resp.policy_source === 'gemini' ? 'Gemini interpreted' : resp.policy_source === 'deterministic' ? 'Locally interpreted' : 'Preset';
   if(el('runPolicyDescription')) el('runPolicyDescription').textContent = resp.policy_explanation || 'The run used the displayed deterministic release thresholds.';
   el('scorecardSection').classList.remove('hidden');
-  renderPareto(resp);
-  renderDistributions(resp);
+  // Let the verdict and scorecard paint before constructing both charts.
+  requestAnimationFrame(() => {
+    renderPareto(resp);
+    const renderDistributionChart = () => renderDistributions(resp);
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(renderDistributionChart, {timeout: 250});
+    } else {
+      setTimeout(renderDistributionChart, 0);
+    }
+  });
 }
 
 let currentDistData = null;
@@ -3152,7 +3160,7 @@ function renderPareto(resp) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      animation: {duration:450, easing:'easeOutQuart'},
+      animation: {duration:0},
       plugins: {
         legend: { labels: { color: tick, boxWidth: 10 } },
         tooltip: { enabled:false, external:externalTooltip },
@@ -4415,13 +4423,48 @@ function renderCast(){
     c.appendChild(d);
   });
 }
+const agentActiveSince = {};
+const agentFinishTimers = {};
+
+function finishAgentVisual(k, msg){
+  const card=el('agent-'+k), dot=el('agent-status-'+k), m=el('agent-msg-'+k);
+  if(!card) return;
+  card.classList.remove('agent-active','border-indigo-500');
+  dot.className='ml-auto h-2.5 w-2.5 rounded-full bg-emerald-400';
+  if(msg) m.textContent=msg;
+}
+
 function setAgent(k, msg, done){
   const card=el('agent-'+k), dot=el('agent-status-'+k), m=el('agent-msg-'+k);
   if(!card) return;
-  Object.keys(AGENTS).forEach(x=>{ const e=el('agent-'+x); if(e) e.classList.remove('agent-active','border-indigo-500'); });
-  if(!done){ card.classList.add('agent-active','border-indigo-500'); dot.className='ml-auto h-2.5 w-2.5 rounded-full bg-indigo-400'; }
-  else { dot.className='ml-auto h-2.5 w-2.5 rounded-full bg-emerald-400'; }
-  if(msg) m.textContent=msg;
+  if(!done){
+    if(agentFinishTimers[k]) clearTimeout(agentFinishTimers[k]);
+    agentActiveSince[k] = Date.now();
+    Object.keys(AGENTS).forEach(x=>{
+      if(x === 'orchestrator' && agentFinishTimers[x]) return;
+      const e=el('agent-'+x);
+      if(e) e.classList.remove('agent-active','border-indigo-500');
+    });
+    card.classList.add('agent-active','border-indigo-500');
+    dot.className='ml-auto h-2.5 w-2.5 rounded-full bg-indigo-400';
+    if(msg) m.textContent=msg;
+    return;
+  }
+  // Keep the Arbiter visible for UX without sleeping in the server pipeline.
+  const remaining = k === 'orchestrator'
+    ? Math.max(0, 1200 - (Date.now() - (agentActiveSince[k] || 0)))
+    : 0;
+  if(remaining > 0){
+    const activation = agentActiveSince[k];
+    if(msg) m.textContent=msg;
+    if(agentFinishTimers[k]) clearTimeout(agentFinishTimers[k]);
+    agentFinishTimers[k] = setTimeout(() => {
+      delete agentFinishTimers[k];
+      if(agentActiveSince[k] === activation) finishAgentVisual(k, msg);
+    }, remaining);
+    return;
+  }
+  finishAgentVisual(k, msg);
 }
 
 function bar(label, value, good, threshold, thresholdLabel){
@@ -4793,12 +4836,12 @@ function finish(resp){
   renderScorecard(resp);
 
   if (resp.rounds && resp.rounds.length > 0) {
-    const finalRound = resp.rounds[resp.rounds.length - 1];
-    const u = finalRound.utility;
-    const a = finalRound.attack;
-    updateMetrics(u, a);
-    el('roundsBody').innerHTML = '';
-    resp.rounds.forEach(r => addRoundRow(r));
+    // Live SSE already rendered these rows. Rebuild only when loading a stored
+    // response that did not stream through this page.
+    const body = el('roundsBody');
+    if (body && body.children.length === 0) {
+      resp.rounds.forEach(r => addRoundRow(r));
+    }
   }
 
   const isOk = isCertified(resp);

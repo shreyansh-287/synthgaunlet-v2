@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import logging
 import threading
-import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Dict, List, Optional
@@ -650,6 +649,14 @@ def run_forge(
 
         # Generate N candidate plans for this round. A pure DP run samples only
         # from the already released noisy marginals (post-processing).
+        emit({
+            "type": "agent", "agent": "generator", "round": i, "done": False,
+            "message": (
+                "Forge is preparing the next Laplace redraw..."
+                if dp_model is not None
+                else f"Forge is planning the Round {i} candidate beam..."
+            ),
+        })
         if dp_model is not None:
             candidates = [dp_engine.release_plan(dp_model)]
         elif i == 1:
@@ -712,10 +719,19 @@ def run_forge(
         })
 
         cand_utils = []
-        for cand_synth in candidate_synths:
-            if _is_aborted(run_id):
-                break
-            cand_utils.append(statistician.evaluate(real_train, real_test, cand_synth, cols["label"], profile=profile))
+        if not _is_aborted(run_id):
+            # Beam candidates are independent within a round. Evaluate them
+            # concurrently while preserving their original list order.
+            with ThreadPoolExecutor(
+                max_workers=min(3, len(candidate_synths)),
+                thread_name_prefix="auditor",
+            ) as pool:
+                cand_utils = list(pool.map(
+                    lambda frame: statistician.evaluate(
+                        real_train, real_test, frame, cols["label"], profile=profile,
+                    ),
+                    candidate_synths,
+                ))
 
         best_fid = max(u.fidelity_score for u in cand_utils) if cand_utils else 0.0
         best_tstr = max(u.utility_ratio for u in cand_utils) if cand_utils else 0.0
@@ -743,15 +759,29 @@ def run_forge(
         })
 
         cand_attacks = []
-        for cand_synth in candidate_synths:
-            if _is_aborted(run_id):
-                break
-            cand_attacks.append(
-                attacker.attack(
-                    profile, real_train, real_test, cand_synth, cols["quasi_identifiers"],
-                    prior=prior_for_attacker,
-                )
+        if not _is_aborted(run_id):
+            # The initial attack prompt depends on the round/profile, not on a
+            # candidate. Ask Gemini once, then run each candidate's deterministic
+            # tools and adaptive follow-up concurrently.
+            shared_attack_plan = attacker.plan_attack(
+                profile, cols["quasi_identifiers"], prior_for_attacker,
             )
+            with ThreadPoolExecutor(
+                max_workers=min(3, len(candidate_synths)),
+                thread_name_prefix="challenger",
+            ) as pool:
+                cand_attacks = list(pool.map(
+                    lambda frame: attacker.attack(
+                        profile,
+                        real_train,
+                        real_test,
+                        frame,
+                        cols["quasi_identifiers"],
+                        prior=prior_for_attacker,
+                        initial_plan=shared_attack_plan,
+                    ),
+                    candidate_synths,
+                ))
 
         emit({
             "type": "agent", "agent": "attacker", "round": i, "done": True,
@@ -775,11 +805,6 @@ def run_forge(
             "type": "agent", "agent": "orchestrator", "round": i, "done": False,
             "message": "Arbiter is verifying release thresholds against Pareto frontier...",
         })
-        # The gate check is immediate. On the live stream, hold this working
-        # state so the Arbiter card can show its highlight before the verdict.
-        if progress is not None:
-            time.sleep(1.5)
-
         evaluations: List[CandidateEvaluation] = []
         for c_idx in range(len(candidates)):
             cand_plan = candidates[c_idx]
@@ -946,11 +971,38 @@ def run_forge(
         if passed and req.destination_table_id:
             final_table_id = reporter.publish_bigquery(synth, req.destination_table_id)
 
-    scorecard = reporter.build_scorecard(
-        rounds, status, thresholds, meta.domain,
-        difficulty=difficulty["difficulty"],
-        difficulty_detail=difficulty["difficulty_detail"],
+    fairness_report = (
+        rounds[-1].utility.fairness
+        if rounds and rounds[-1].utility.fairness and rounds[-1].utility.fairness.summary
+        else None
     )
+    # Reporter and fairness prose are independent advisory calls. Running them
+    # together avoids two serial Vertex round trips before the final UI update.
+    with ThreadPoolExecutor(max_workers=2, thread_name_prefix="reporter") as pool:
+        scorecard_future = pool.submit(
+            reporter.build_scorecard,
+            rounds,
+            status,
+            thresholds,
+            meta.domain,
+            difficulty["difficulty"],
+            difficulty["difficulty_detail"],
+        )
+        fairness_future = None
+        if fairness_report is not None:
+            fairness_future = pool.submit(
+                llm.advise,
+                "statistician",
+                "Explain the fairness findings without changing the release decision.",
+                (
+                    "Fairness is advisory and does not block certification. "
+                    f"Status: {fairness_report.status}. "
+                    f"Summary: {fairness_report.summary}"
+                ),
+                model=settings.reporter_model,
+            )
+        scorecard = scorecard_future.result()
+        fairness_note = fairness_future.result() if fairness_future is not None else ""
     if final_status == "CERTIFIED_AFTER_RESCUE":
         scorecard += (
             "\n\nAUTO-HEAL: CERTIFIED_AFTER_RESCUE. A rescue attempt passed the "
@@ -965,19 +1017,9 @@ def run_forge(
         pure_dp, dp_model.epsilon_spent if dp_model is not None else 0.0
     )
     scorecard += f"\n\nDIFFERENTIAL PRIVACY: {formal_dp_guarantee}"
-    if rounds and rounds[-1].utility.fairness and rounds[-1].utility.fairness.summary:
-        fairness_note = llm.advise(
-            "statistician",
-            "Explain the fairness findings without changing the release decision.",
-            (
-                "Fairness is advisory and does not block certification. "
-                f"Status: {rounds[-1].utility.fairness.status}. "
-                f"Summary: {rounds[-1].utility.fairness.summary}"
-            ),
-            model=settings.reporter_model,
-        )
-        if fairness_note:
-            scorecard += f"\n\nFAIRNESS NARRATIVE: {fairness_note}"
+    if fairness_note:
+        scorecard += f"\n\nFAIRNESS NARRATIVE: {fairness_note}"
+    if fairness_report is not None:
         flush_ai()
     if frontier:
         optimal = sum(1 for candidate in frontier if candidate.is_pareto_optimal)
@@ -1034,6 +1076,9 @@ def run_forge(
                     "epsilon_spent": dp_model.epsilon_spent if dp_model is not None else None,
                     "dp_queries": list(dp_model.query_names) if dp_model is not None else [],
                     "n_rows": n_rows,
+                    # The scorecard already contains the Reporter model's
+                    # executive summary. Avoid another serial LLM wait here.
+                    "skip_ai_narrative": True,
                 },
             )
         except Exception:

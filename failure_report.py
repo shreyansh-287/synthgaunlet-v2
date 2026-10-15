@@ -178,7 +178,11 @@ def _build(run_id: str, response: dict, context: dict) -> dict:
         "diagnostics": _diagnostics(utility),
         "tstr_detail": utility.get("tstr_detail") or {},
         "engine_summary": _engine_summary(mode, guarantee, context, response),
-        "ai_narrative": _ai_narrative(findings, mode, guarantee),
+        "ai_narrative": (
+            ""
+            if context.get("skip_ai_narrative")
+            else _ai_narrative(findings, mode, guarantee)
+        ),
     }
 
 
