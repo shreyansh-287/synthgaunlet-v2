@@ -24,7 +24,7 @@ gcloud run deploy "${SERVICE_NAME}" \
   --memory 4Gi --cpu 2 \
   --min-instances 0 --max-instances 5 \
   --timeout 600s \
-  --set-env-vars "GOOGLE_GENAI_USE_VERTEXAI=${GOOGLE_GENAI_USE_VERTEXAI:-true},GEMINI_API_KEY=${GEMINI_API_KEY},GCP_PROJECT=${PROJECT_ID},VERTEX_LOCATION=${REGION},GENERATOR_MODEL=gemini-3.6-flash,ATTACKER_MODEL=gemini-3.6-flash,ORCHESTRATOR_MODEL=gemini-3.6-flash,REPORTER_MODEL=gemini-3.6-flash,GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-845643368139-kjafc7tpu1eus9cfg12jm6gulue4cue3.apps.googleusercontent.com}"
+  --set-env-vars "GOOGLE_GENAI_USE_VERTEXAI=${GOOGLE_GENAI_USE_VERTEXAI:-true},GEMINI_API_KEY=${GEMINI_API_KEY},GCP_PROJECT=${PROJECT_ID},VERTEX_LOCATION=${VERTEX_LOCATION:-global},GENERATOR_MODEL=gemini-3.6-flash,ATTACKER_MODEL=gemini-3.6-flash,ORCHESTRATOR_MODEL=gemini-3.6-flash,REPORTER_MODEL=gemini-3.6-flash,GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-845643368139-kjafc7tpu1eus9cfg12jm6gulue4cue3.apps.googleusercontent.com}"
 
 gcloud run services describe "${SERVICE_NAME}" --region "${REGION}" \
   --format="value(status.url)"
