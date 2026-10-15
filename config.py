@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     attacker_model: str = "gemini-3.6-flash"
     orchestrator_model: str = "gemini-3.6-flash"
     reporter_model: str = "gemini-3.6-flash"
+    # Give Gemini time to finish. A local fallback is used only if the call fails.
+    llm_timeout_ms: int = 30000
+    llm_max_retries: int = 3
 
     # --- Adversarial loop thresholds ---
     max_rounds: int = 5

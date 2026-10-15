@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import threading
 import time
 import urllib.request
 from typing import Any, Dict, Optional, Type, TypeVar
@@ -20,74 +21,80 @@ T = TypeVar("T", bound=BaseModel)
 _gemini_client = None
 _init_attempted = False
 _llm_failed = False
+_STATE_LOCK = threading.RLock()
 
 
 def _get_gemini_client():
     global _gemini_client, _init_attempted
-    if _init_attempted:
+    with _STATE_LOCK:
+        if _init_attempted:
+            return _gemini_client
+        _init_attempted = True
+        settings = get_settings()
+        if not settings.gemini_configured:
+            return None
+        try:
+            from google import genai
+            from google.genai import types
+
+            fast_http = types.HttpOptions(timeout=max(1000, settings.llm_timeout_ms))
+
+            if settings.google_genai_use_vertexai:
+                _gemini_client = genai.Client(
+                    vertexai=True,
+                    project=settings.gcp_project,
+                    location=settings.vertex_location,
+                    http_options=fast_http,
+                )
+                logger.info(
+                    "Vertex AI Gemini client initialised (project=%s, location=%s).",
+                    settings.gcp_project,
+                    settings.vertex_location,
+                )
+            else:
+                _gemini_client = genai.Client(
+                    api_key=settings.gemini_api_key,
+                    http_options=fast_http,
+                )
+                logger.info("Gemini Developer API client initialised.")
+        except Exception as exc:  # noqa: BLE001
+            if settings.google_genai_use_vertexai:
+                logger.warning(
+                    "Vertex AI client init failed (%s). Ensure ADC is configured via 'gcloud auth application-default'. "
+                    "Public REST fallback is disabled in Vertex mode.",
+                    exc,
+                )
+            else:
+                logger.info("GenAI SDK not available locally (%s); using REST API fallback.", exc)
         return _gemini_client
-    _init_attempted = True
-    settings = get_settings()
-    if not settings.gemini_configured:
-        return None
-    try:
-        from google import genai
-        from google.genai import types
-
-        fast_http = types.HttpOptions(timeout=60000)
-
-        if settings.google_genai_use_vertexai:
-            _gemini_client = genai.Client(
-                vertexai=True,
-                project=settings.gcp_project,
-                location=settings.vertex_location,
-                http_options=fast_http,
-            )
-            logger.info(
-                "Vertex AI Gemini client initialised (project=%s, location=%s).",
-                settings.gcp_project,
-                settings.vertex_location,
-            )
-        else:
-            _gemini_client = genai.Client(
-                api_key=settings.gemini_api_key,
-                http_options=fast_http,
-            )
-            logger.info("Gemini Developer API client initialised.")
-    except Exception as exc:  # noqa: BLE001
-        if settings.google_genai_use_vertexai:
-            logger.warning(
-                "Vertex AI client init failed (%s). Ensure ADC is configured via 'gcloud auth application-default'. "
-                "Public REST fallback is disabled in Vertex mode.",
-                exc,
-            )
-        else:
-            logger.info("GenAI SDK not available locally (%s); using REST API fallback.", exc)
-    return _gemini_client
 
 
 def reset_llm_state() -> None:
-    global _llm_failed, _init_attempted, _RUN_LOG
-    _llm_failed = False
-    _init_attempted = False
-    _RUN_LOG = []
+    global _llm_failed, _RUN_LOG
+    with _STATE_LOCK:
+        _llm_failed = False
+        # Keep the SDK client warm between runs. Recreating it at every Forge click
+        # adds avoidable Vertex authentication and transport setup latency.
+        _RUN_LOG = []
 
 
 def get_run_log() -> list[Dict[str, Any]]:
     """Advisory calls made during the current forge run."""
-    return list(_RUN_LOG)
+    with _STATE_LOCK:
+        return list(_RUN_LOG)
 
 
 def record(role: str, purpose: str, model: str, used_model: bool) -> None:
     """Remember an advisory call that already happened, such as policy interpretation."""
     if not role:
         return
-    _RUN_LOG.append({
-        "role": role,
-        "purpose": purpose,
-        "model": model,
-        "used_model": bool(used_model),
-    })
+    with _STATE_LOCK:
+        _RUN_LOG.append({
+            "role": role,
+            "purpose": purpose,
+            "model": model,
+            "used_model": bool(used_model),
+        })
 
 
 def _record(role: str, purpose: str, model: str, used_model: bool) -> None:
@@ -134,34 +141,39 @@ _RUN_LOG: list[Dict[str, Any]] = []
 
 def get_token_usage() -> Dict[str, int]:
     """Return cumulative token usage stats across the application lifetime."""
-    return {
-        "total_calls": _TOTAL_LLM_CALLS,
-        "input_tokens": _TOTAL_INPUT_TOKENS,
-        "output_tokens": _TOTAL_OUTPUT_TOKENS,
-        "total_tokens": _TOTAL_INPUT_TOKENS + _TOTAL_OUTPUT_TOKENS,
-    }
+    with _STATE_LOCK:
+        return {
+            "total_calls": _TOTAL_LLM_CALLS,
+            "input_tokens": _TOTAL_INPUT_TOKENS,
+            "output_tokens": _TOTAL_OUTPUT_TOKENS,
+            "total_tokens": _TOTAL_INPUT_TOKENS + _TOTAL_OUTPUT_TOKENS,
+        }
 
 
 def _log_tokens(model: str, prompt_tokens: int, output_tokens: int) -> None:
     global _TOTAL_INPUT_TOKENS, _TOTAL_OUTPUT_TOKENS, _TOTAL_LLM_CALLS
-    _TOTAL_INPUT_TOKENS += prompt_tokens
-    _TOTAL_OUTPUT_TOKENS += output_tokens
-    _TOTAL_LLM_CALLS += 1
-    call_total = prompt_tokens + output_tokens
-    cum_total = _TOTAL_INPUT_TOKENS + _TOTAL_OUTPUT_TOKENS
+    with _STATE_LOCK:
+        _TOTAL_INPUT_TOKENS += prompt_tokens
+        _TOTAL_OUTPUT_TOKENS += output_tokens
+        _TOTAL_LLM_CALLS += 1
+        call_number = _TOTAL_LLM_CALLS
+        call_total = prompt_tokens + output_tokens
+        cum_total = _TOTAL_INPUT_TOKENS + _TOTAL_OUTPUT_TOKENS
     print(
-        f"[Gemini Token Usage] Call #{_TOTAL_LLM_CALLS} ({model}) | "
+        f"[Gemini Token Usage] Call #{call_number} ({model}) | "
         f"Prompt: {prompt_tokens:,} | Response: {output_tokens:,} | "
         f"Call Total: {call_total:,} | Cumulative Total: {cum_total:,} tokens"
     )
     logger.info(
         "Gemini Token Usage - Call #%d (%s): prompt=%d, response=%d, total=%d (cumulative=%d)",
-        _TOTAL_LLM_CALLS, model, prompt_tokens, output_tokens, call_total, cum_total,
+        call_number, model, prompt_tokens, output_tokens, call_total, cum_total,
     )
 
 
-def _call_with_backoff(callable_fn, max_retries: int = 3):
+def _call_with_backoff(callable_fn, max_retries: Optional[int] = None):
     """Execute LLM call with exponential backoff (1s, 2s, 4s) on transient errors."""
+    if max_retries is None:
+        max_retries = max(1, get_settings().llm_max_retries)
     for attempt in range(max_retries):
         try:
             return callable_fn()
